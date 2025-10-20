@@ -84,31 +84,67 @@ void Router::route(Method method, const std::string& pattern, Handler handler) {
 
 Response Router::handle(const Request& request) {
     try {
-        // Executar middlewares
-        for (auto& middleware : middlewares_) {
-            Response response;
-            if (!middleware(const_cast<Request&>(request), response)) {
-                // Middleware bloqueou o request
-                return response;
-            }
-        }
-        
-        // Encontrar rota
-        std::unordered_map<std::string, std::string> params;
-        const Route* route = findRoute(request, params);
-        
-        if (!route) {
-            return notFoundHandler(request);
-        }
-        
-        // Adicionar parâmetros ao request
+        Response response;
         auto& req = const_cast<Request&>(request);
-        for (const auto& [key, value] : params) {
-            req.addParam(key, value);
-        }
         
-        // Executar handler
-        return route->handler(request);
+        // Se tem MiddlewareChain v2.0, usar ela
+        if (middlewareChain_) {
+            middlewareChain_->execute(req, response, [&]() {
+                // Executar middlewares legados
+                for (auto& middleware : middlewares_) {
+                    Response tempResponse;
+                    if (!middleware(req, tempResponse)) {
+                        // Middleware bloqueou o request
+                        response = tempResponse;
+                        return;
+                    }
+                }
+                
+                // Encontrar rota
+                std::unordered_map<std::string, std::string> params;
+                const Route* route = findRoute(request, params);
+                
+                if (!route) {
+                    response = notFoundHandler(request);
+                    return;
+                }
+                
+                // Adicionar parâmetros ao request
+                for (const auto& [key, value] : params) {
+                    req.addParam(key, value);
+                }
+                
+                // Executar handler
+                response = route->handler(request);
+            });
+            
+            return response;
+        } else {
+            // Sistema legado (sem MiddlewareChain)
+            // Executar middlewares
+            for (auto& middleware : middlewares_) {
+                if (!middleware(req, response)) {
+                    // Middleware bloqueou o request
+                    return response;
+                }
+            }
+            
+            // Encontrar rota
+            std::unordered_map<std::string, std::string> params;
+            const Route* route = findRoute(request, params);
+            
+            if (!route) {
+                return notFoundHandler(request);
+            }
+            
+            // Adicionar parâmetros ao request
+            for (const auto& [key, value] : params) {
+                req.addParam(key, value);
+            }
+            
+            // Executar handler
+            return route->handler(request);
+        }
         
     } catch (const std::exception& e) {
         return errorHandler(e);
@@ -137,6 +173,14 @@ Response Router::notFoundHandler(const Request& request) {
 Response Router::errorHandler(const std::exception& e) {
     std::string body = std::string("500 Internal Server Error: ") + e.what();
     return Response(StatusCode::InternalServerError).text(body);
+}
+
+void Router::setMiddlewares(std::shared_ptr<MiddlewareChain> chain) {
+    middlewareChain_ = chain;
+}
+
+std::shared_ptr<MiddlewareChain> Router::getMiddlewares() const {
+    return middlewareChain_;
 }
 
 } // namespace Core::Http

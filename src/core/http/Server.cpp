@@ -3,6 +3,7 @@
 #include "Response.hpp"
 #include "Router.hpp"
 #include "../utils/Logger.hpp"
+#include "../utils/LoggerNew.hpp"
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -197,7 +198,7 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     // Buffer para ler dados
     char buffer[8192];
     
-    // Ler dados do socket
+    // Ler dados do socket (primeiro recv para headers)
     int bytesReceived = recv(socket, buffer, sizeof(buffer) - 1, 0);
     
     if (bytesReceived <= 0) {
@@ -208,6 +209,9 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     
     // Parsear manualmente!
     std::string rawRequest(buffer, bytesReceived);
+    
+    LOG_DEBUG("First recv() - bytes received: " + std::to_string(bytesReceived));
+    
     std::istringstream stream(rawRequest);
     
     auto request = std::make_unique<Request>();
@@ -250,9 +254,21 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     // Verificar Content-Length header
     std::string contentLengthStr = request->getHeader("Content-Length");
     
+    // DEBUG LOG: Log do raw request
+    LOG_DEBUG("=== RAW REQUEST DEBUG ===");
+    LOG_DEBUG("Total rawRequest size: " + std::to_string(rawRequest.length()));
+    LOG_DEBUG("Content-Length header: " + contentLengthStr);
+    
+    // Log primeiros 500 caracteres do rawRequest
+    if (rawRequest.length() > 0) {
+        size_t previewLen = std::min(rawRequest.length(), size_t(500));
+        LOG_DEBUG("Raw request preview (first " + std::to_string(previewLen) + " chars): " + rawRequest.substr(0, previewLen));
+    }
+    
     if (!contentLengthStr.empty()) {
         try {
             int contentLength = std::stoi(contentLengthStr);
+            LOG_DEBUG("Parsed Content-Length: " + std::to_string(contentLength));
             
             if (contentLength > 0) {
                 // Calcular posição atual no buffer
@@ -263,25 +279,79 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
                 
                 // Pegar o body do rawRequest original
                 size_t bodyStartPos = rawRequest.find("\r\n\r\n");
+                LOG_DEBUG("Body start position: " + std::to_string(bodyStartPos));
+                
                 if (bodyStartPos != std::string::npos) {
                     bodyStartPos += 4;  // Pular "\r\n\r\n"
+                    LOG_DEBUG("Body start (after \\r\\n\\r\\n): " + std::to_string(bodyStartPos));
                     
                     if (bodyStartPos < rawRequest.length()) {
                         std::string body = rawRequest.substr(bodyStartPos);
+                        LOG_DEBUG("Body extracted (length=" + std::to_string(body.length()) + "): " + body);
                         
                         // Limitar ao Content-Length
                         if (body.length() > static_cast<size_t>(contentLength)) {
                             body = body.substr(0, contentLength);
+                            LOG_DEBUG("Body trimmed to Content-Length: " + body);
                         }
                         
                         request->setBody(body);
+                        LOG_DEBUG("Body set successfully!");
+                    } else {
+                        // Body não veio no primeiro recv(), precisamos ler mais!
+                        LOG_WARNING("Body not in first packet! Body should start at " + std::to_string(bodyStartPos) + 
+                                   " but rawRequest length is " + std::to_string(rawRequest.length()));
+                        LOG_INFO("Reading additional " + std::to_string(contentLength) + " bytes for body...");
+                        
+                        // Ler o body em um segundo recv()
+                        char bodyBuffer[8192];
+                        int totalBodyReceived = 0;
+                        std::string body;
+                        
+                        while (totalBodyReceived < contentLength) {
+                            int remainingBytes = contentLength - totalBodyReceived;
+                            int bytesToRead = std::min(remainingBytes, (int)sizeof(bodyBuffer) - 1);
+                            
+                            int bodyBytesReceived = recv(socket, bodyBuffer, bytesToRead, 0);
+                            
+                            if (bodyBytesReceived <= 0) {
+                                LOG_ERROR("Failed to read body from socket (received " + 
+                                         std::to_string(bodyBytesReceived) + " bytes)");
+                                break;
+                            }
+                            
+                            bodyBuffer[bodyBytesReceived] = '\0';
+                            body.append(bodyBuffer, bodyBytesReceived);
+                            totalBodyReceived += bodyBytesReceived;
+                            
+                            LOG_DEBUG("Body chunk received: " + std::to_string(bodyBytesReceived) + 
+                                     " bytes (total: " + std::to_string(totalBodyReceived) + "/" + 
+                                     std::to_string(contentLength) + ")");
+                        }
+                        
+                        if (totalBodyReceived == contentLength) {
+                            LOG_INFO("Body successfully read from second recv(): " + body);
+                            request->setBody(body);
+                            LOG_DEBUG("Body set successfully!");
+                        } else {
+                            LOG_ERROR("Failed to read complete body! Expected " + std::to_string(contentLength) + 
+                                     " bytes, got " + std::to_string(totalBodyReceived));
+                        }
                     }
+                } else {
+                    LOG_WARNING("Could not find \\r\\n\\r\\n separator in raw request!");
                 }
+            } else {
+                LOG_DEBUG("Content-Length is 0 or negative, skipping body parsing");
             }
-        } catch (...) {
-            // Ignorar erro de parsing do Content-Length
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error parsing Content-Length: " + std::string(e.what()));
         }
+    } else {
+        LOG_DEBUG("No Content-Length header found");
     }
+    
+    LOG_DEBUG("=== END RAW REQUEST DEBUG ===");
     
     return request;
 }

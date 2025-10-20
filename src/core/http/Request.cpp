@@ -82,4 +82,20 @@ void Request::addQuery(const std::string& key, const std::string& value) {
     query_[key] = value;
 }
 
+void Request::setCustomData(const std::string& key, const std::string& value) {
+    customData_[key] = value;
+}
+
+std::string Request::getCustomData(const std::string& key) const {
+    auto it = customData_.find(key);
+    if (it != customData_.end()) {
+        return it->second;
+    }
+    return "";
+}
+
+bool Request::hasCustomData(const std::string& key) const {
+    return customData_.find(key) != customData_.end();
+}
+
 } // namespace Core::Http

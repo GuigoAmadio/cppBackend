@@ -167,6 +167,24 @@ public:
      */
     void addQuery(const std::string& key, const std::string& value);
     
+    // === CUSTOM DATA (para middlewares) ===
+    
+    /**
+     * @brief Adiciona dados customizados ao request (ex: tenant_id por um middleware)
+     */
+    void setCustomData(const std::string& key, const std::string& value);
+    
+    /**
+     * @brief Obtém dado customizado do request
+     * @return Valor se existe, string vazia caso contrário
+     */
+    std::string getCustomData(const std::string& key) const;
+    
+    /**
+     * @brief Verifica se existe um dado customizado
+     */
+    bool hasCustomData(const std::string& key) const;
+    
 private:
     // Armazena o método HTTP (GET, POST, etc.)
     Method method_ = Method::UNKNOWN;
@@ -188,6 +206,9 @@ private:
 
     // Corpo da requisição (normalmente para métodos POST/PUT)
     std::string body_;
+    
+    // Dados customizados (usados por middlewares, ex: tenant_id, user_id)
+    std::unordered_map<std::string, std::string> customData_;
 };
 
 } // namespace Core::Http

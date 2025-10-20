@@ -7,6 +7,7 @@
 #include <memory>
 #include "Request.hpp"
 #include "Response.hpp"
+#include "Middleware.hpp"
 
 namespace Core::Http {
 
@@ -124,6 +125,17 @@ public:
      */
     using Middleware = std::function<bool(Request&, Response&)>;
     void use(Middleware middleware);
+    
+    /**
+     * Define uma MiddlewareChain para ser executada antes das rotas.
+     * Esta é a versão v2.0 do sistema de middlewares.
+     */
+    void setMiddlewares(std::shared_ptr<MiddlewareChain> chain);
+    
+    /**
+     * Retorna a MiddlewareChain atual (se existir).
+     */
+    std::shared_ptr<MiddlewareChain> getMiddlewares() const;
 
 private:
     // Vetor com todas as rotas registradas
@@ -131,6 +143,9 @@ private:
 
     // Vetor de middlewares a serem executados antes de qualquer handler
     std::vector<Middleware> middlewares_;
+    
+    // MiddlewareChain v2.0 (novo sistema)
+    std::shared_ptr<MiddlewareChain> middlewareChain_;
 
     // Busca uma rota que "case" com o request
     // Retorna ponteiro (caso match), ou nullptr se nenhuma corresponder
