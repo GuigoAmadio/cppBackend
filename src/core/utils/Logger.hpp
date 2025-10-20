@@ -19,7 +19,7 @@ public:
         DEBUG,
         INFO,
         WARNING,
-        ERROR
+        ERR  // Renomeado de ERROR para evitar conflito com macro do Windows
     };
     
     static void setLevel(Level level) {
@@ -39,7 +39,7 @@ public:
     }
     
     static void error(const std::string& message) {
-        log(Level::ERROR, message);
+        log(Level::ERR, message);
     }
     
 private:
@@ -66,7 +66,7 @@ private:
             case Level::WARNING:
                 oss << "[WARN]  ";
                 break;
-            case Level::ERROR:
+            case Level::ERR:
                 oss << "[ERROR] ";
                 break;
         }
@@ -75,7 +75,7 @@ private:
         oss << message;
         
         // Output
-        if (level == Level::ERROR) {
+        if (level == Level::ERR) {
             std::cerr << oss.str() << std::endl;
         } else {
             std::cout << oss.str() << std::endl;

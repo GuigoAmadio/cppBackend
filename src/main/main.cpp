@@ -13,10 +13,14 @@
 #include "../core/http/Request.hpp"
 #include "../core/http/Response.hpp"
 #include "../core/utils/Logger.hpp"
+#include "../core/database/Connection.hpp"
 
 #include <iostream>
 #include <memory>
 #include <csignal>
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 using namespace Core::Http;
 using namespace Core::Utils;
@@ -42,12 +46,14 @@ void setupRoutes(Router& router) {
     
     // ==================== HEALTH CHECK ====================
     router.get("/health", [](const Request& req) {
+        (void)req;  // Evitar warning unused parameter
         return Response(StatusCode::OK)
             .text("OK - Server is running!");
     });
     
     // ==================== ROOT ====================
     router.get("/", [](const Request& req) {
+        (void)req;  // Evitar warning unused parameter
         std::string html = R"(
 <!DOCTYPE html>
 <html>
@@ -137,6 +143,7 @@ curl http://localhost:8080/api/users/123
     
     // ==================== API ====================
     router.get("/api/hello", [](const Request& req) {
+        (void)req;  // Evitar warning unused parameter
         return Response(StatusCode::OK)
             .text("Hello from C++ Backend!");
     });
@@ -150,6 +157,119 @@ curl http://localhost:8080/api/users/123
         response += "Email: john@example.com\n";
         
         return Response(StatusCode::OK).text(response);
+    });
+    
+    // ==================== JSON ECHO (POST) ====================
+    router.post("/api/echo", [](const Request& req) {
+        auto json = req.getJson();
+        
+        if (!json) {
+            // JSON inválido ou body vazio
+            auto error = Core::Json::makeObject();
+            error->asObject()["error"] = Core::Json::makeString("Invalid JSON");
+            return Response(StatusCode::BadRequest).json(*error);
+        }
+        
+        // Retorna o mesmo JSON recebido
+        return Response(StatusCode::OK).json(*json);
+    });
+    
+    // ==================== JSON CREATE USER (POST) ====================
+    router.post("/api/users", [](const Request& req) {
+        auto json = req.getJson();
+        
+        if (!json || !json->isObject()) {
+            auto error = Core::Json::makeObject();
+            error->asObject()["error"] = Core::Json::makeString("Invalid request body");
+            return Response(StatusCode::BadRequest).json(*error);
+        }
+        
+        // Extrair dados
+        auto nameValue = json->get("name");
+        auto emailValue = json->get("email");
+        
+        if (!nameValue || !emailValue) {
+            auto error = Core::Json::makeObject();
+            error->asObject()["error"] = Core::Json::makeString("name and email are required");
+            return Response(StatusCode::BadRequest).json(*error);
+        }
+        
+        // Criar resposta (simular criação de usuário)
+        auto response = Core::Json::makeObject();
+        response->asObject()["id"] = Core::Json::makeNumber(123);
+        response->asObject()["name"] = nameValue;
+        response->asObject()["email"] = emailValue;
+        response->asObject()["created"] = Core::Json::makeBool(true);
+        
+        return Response(StatusCode::Created).json(*response);
+    });
+    
+    // ==================== TESTE DE THREADING ====================
+    router.get("/api/slow/:seconds", [](const Request& req) {
+        // Simula uma operação lenta
+        std::string secondsStr = req.getParam("seconds");
+        int seconds = std::stoi(secondsStr);
+        
+        Logger::info("⏳ Dormindo por " + std::to_string(seconds) + " segundos...");
+        std::this_thread::sleep_for(std::chrono::seconds(seconds));
+        Logger::info("✅ Acordei!");
+        
+        return Response(StatusCode::OK).text("Dormi por " + std::to_string(seconds) + " segundos!");
+    });
+    
+    // ==================== CONTADOR DE REQUISIÇÕES ====================
+    static std::atomic<int> requestCount{0};
+    
+    router.get("/api/counter", [](const Request& req) {
+        (void)req;
+        int count = ++requestCount;
+        
+        auto json = Core::Json::makeObject();
+        json->asObject()["count"] = Core::Json::makeNumber(count);
+        json->asObject()["message"] = Core::Json::makeString("Requisição #" + std::to_string(count));
+        
+        return Response(StatusCode::OK).json(*json);
+    });
+    
+    // ==================== TESTE DE CONEXÃO COM BANCO ====================
+    router.get("/api/db/test", [](const Request& req) {
+        (void)req;
+        
+        auto json = Core::Json::makeObject();
+        
+        try {
+            // Tentar conectar ao banco
+            // NOTA: Ajuste a connection string conforme seu ambiente
+            Core::Database::Connection conn(
+                "host=localhost port=5433 dbname=moneymaker_dev user=moneymaker_user password=postgre123"
+            );
+            
+            if (!conn.isConnected()) {
+                json->asObject()["status"] = Core::Json::makeString("error");
+                json->asObject()["message"] = Core::Json::makeString("Falha ao conectar ao banco");
+                return Response(StatusCode::InternalServerError).json(*json);
+            }
+            
+            // Executar query de teste
+            auto result = conn.execute("SELECT version()");
+            
+            if (result.isSuccess() && result.rowCount() > 0) {
+                json->asObject()["status"] = Core::Json::makeString("success");
+                json->asObject()["connected"] = Core::Json::makeBool(true);
+                json->asObject()["version"] = Core::Json::makeString(result.getValue(0, 0));
+                json->asObject()["message"] = Core::Json::makeString("PostgreSQL conectado com sucesso!");
+            } else {
+                json->asObject()["status"] = Core::Json::makeString("error");
+                json->asObject()["message"] = Core::Json::makeString(result.getError());
+            }
+            
+        } catch (const std::exception& e) {
+            json->asObject()["status"] = Core::Json::makeString("error");
+            json->asObject()["message"] = Core::Json::makeString(e.what());
+            return Response(StatusCode::InternalServerError).json(*json);
+        }
+        
+        return Response(StatusCode::OK).json(*json);
     });
     
     // ==================== 404 CUSTOM ====================
@@ -199,4 +319,3 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
-

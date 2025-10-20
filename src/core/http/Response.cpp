@@ -1,4 +1,5 @@
 #include "Response.hpp"
+#include "../json/Json.hpp"
 #include <sstream>
 
 namespace Core::Http {
@@ -28,8 +29,13 @@ Response& Response::setHeader(const std::string& name, const std::string& value)
 
 Response& Response::json(const Core::Json::JsonValue& value) {
     setHeader("Content-Type", "application/json");
-    // TODO: Serializar JsonValue para string
-    setBody("{}");
+    
+    // Serializar JsonValue para string
+    // Note: precisamos de um shared_ptr, então criamos um temporário
+    // (não ideal, mas funciona por enquanto)
+    std::string jsonStr = value.toString(0);
+    setBody(jsonStr);
+    
     return *this;
 }
 

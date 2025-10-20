@@ -68,7 +68,7 @@ void Router::put(const std::string& pattern, Handler handler) {
 }
 
 void Router::del(const std::string& pattern, Handler handler) {
-    route(Method::DELETE, pattern, handler);
+    route(Method::DEL, pattern, handler);
 }
 
 void Router::patch(const std::string& pattern, Handler handler) {

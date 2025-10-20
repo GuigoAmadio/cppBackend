@@ -15,13 +15,15 @@ Server::Server(int port)
     : port_(port), 
       serverSocket_(INVALID_SOCKET),
       running_(false),
-      threadCount_(std::thread::hardware_concurrency()) {
+      threadCount_(std::thread::hardware_concurrency()),
+      threadPool_(std::make_unique<Threading::ThreadPool>(threadCount_)) {
     
 #ifdef _WIN32
     initWinsock();
 #endif
     
     Utils::Logger::info("Server criado na porta " + std::to_string(port));
+    Utils::Logger::info("ThreadPool criado com " + std::to_string(threadCount_) + " threads");
 }
 
 Server::~Server() {
@@ -56,10 +58,14 @@ void Server::start() {
     }
     
     running_ = true;
+    
+    // 4. Iniciar ThreadPool
+    threadPool_->start();
+    
     Utils::Logger::info("✅ Servidor rodando em http://localhost:" + std::to_string(port_));
     Utils::Logger::info("📡 Aguardando conexões... (Ctrl+C para parar)");
     
-    // 4. Loop principal - aceitar conexões
+    // 5. Loop principal - aceitar conexões
     acceptLoop();
 }
 
@@ -68,6 +74,11 @@ void Server::stop() {
     
     running_ = false;
     Utils::Logger::info("🛑 Parando servidor...");
+    
+    // Parar ThreadPool primeiro (aguarda tarefas terminarem)
+    if (threadPool_) {
+        threadPool_->stop();
+    }
     
     if (serverSocket_ != INVALID_SOCKET) {
         closeSocket(serverSocket_);
@@ -133,12 +144,10 @@ void Server::acceptLoop() {
         
         Utils::Logger::debug("📨 Nova conexão aceita");
         
-        // Processar em thread separada (por enquanto, depois usaremos thread pool)
-        std::thread worker([this, clientSocket]() {
+        // Enviar para ThreadPool processar
+        threadPool_->submit([this, clientSocket]() {
             handleConnection(clientSocket);
         });
-        
-        worker.detach();  // Deixa thread rodar independente
     }
 }
 
@@ -238,14 +247,40 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     }
     
     // Parsear body (se existir)
-    std::string body;
-    std::string bodyLine;
-    while (std::getline(stream, bodyLine)) {
-        body += bodyLine + "\n";
-    }
+    // Verificar Content-Length header
+    std::string contentLengthStr = request->getHeader("Content-Length");
     
-    if (!body.empty()) {
-        request->setBody(body);
+    if (!contentLengthStr.empty()) {
+        try {
+            int contentLength = std::stoi(contentLengthStr);
+            
+            if (contentLength > 0) {
+                // Calcular posição atual no buffer
+                size_t headerEndPos = stream.tellg();
+                if (headerEndPos == static_cast<size_t>(-1)) {
+                    headerEndPos = 0;
+                }
+                
+                // Pegar o body do rawRequest original
+                size_t bodyStartPos = rawRequest.find("\r\n\r\n");
+                if (bodyStartPos != std::string::npos) {
+                    bodyStartPos += 4;  // Pular "\r\n\r\n"
+                    
+                    if (bodyStartPos < rawRequest.length()) {
+                        std::string body = rawRequest.substr(bodyStartPos);
+                        
+                        // Limitar ao Content-Length
+                        if (body.length() > static_cast<size_t>(contentLength)) {
+                            body = body.substr(0, contentLength);
+                        }
+                        
+                        request->setBody(body);
+                    }
+                }
+            }
+        } catch (...) {
+            // Ignorar erro de parsing do Content-Length
+        }
     }
     
     return request;

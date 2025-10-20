@@ -35,14 +35,27 @@ set(CORE_SOURCES
     src/core/http/Router.cpp
 )
 
-# Source files - Stubs (TODO: Implementar depois)
-set(STUB_SOURCES
+# Source files - JSON (IMPLEMENTADO)
+set(JSON_SOURCES
     src/core/json/Json.cpp
     src/core/json/JsonValue.cpp
+    src/core/json/JsonLexer.cpp
+    src/core/json/JsonParser.cpp
+)
+
+# Threading sources
+set(THREADING_SOURCES
     src/core/threading/ThreadPool.cpp
-    src/core/threading/Queue.cpp
-    src/core/utils/String.cpp
+)
+
+# Database sources
+set(DATABASE_SOURCES
     src/core/database/Connection.cpp
+)
+
+# Source files - Stubs (TODO: Implementar depois)
+set(STUB_SOURCES
+    src/core/utils/String.cpp
     src/domains/identity/entities/User.cpp
     src/domains/identity/value_objects/Email.cpp
     src/domains/identity/value_objects/Password.cpp
@@ -58,13 +71,37 @@ set(MAIN_SOURCE
 add_executable(cppBackend 
     ${MAIN_SOURCE}
     ${CORE_SOURCES}
+    ${JSON_SOURCES}
+    ${THREADING_SOURCES}
+    ${DATABASE_SOURCES}
     ${STUB_SOURCES}
 )
+
+# PostgreSQL
+find_library(LIBPQ_LIBRARY NAMES pq libpq PATHS 
+    "C:/msys64/ucrt64/lib"
+    NO_DEFAULT_PATH
+)
+find_path(LIBPQ_INCLUDE_DIR NAMES libpq-fe.h PATHS
+    "C:/msys64/ucrt64/include"
+    NO_DEFAULT_PATH
+)
+
+if(LIBPQ_LIBRARY AND LIBPQ_INCLUDE_DIR)
+    message(STATUS "PostgreSQL found: ${LIBPQ_LIBRARY}")
+    include_directories(${LIBPQ_INCLUDE_DIR})
+else()
+    message(WARNING "PostgreSQL not found - database features will not be available")
+endif()
 
 # Link libraries
 target_link_libraries(cppBackend 
     Threads::Threads
 )
+
+if(LIBPQ_LIBRARY)
+    target_link_libraries(cppBackend ${LIBPQ_LIBRARY})
+endif()
 
 # Se Windows, adicionar Winsock
 if(WIN32)

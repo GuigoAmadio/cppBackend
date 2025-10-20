@@ -1,4 +1,5 @@
 #include "Request.hpp"
+#include "../json/Json.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -31,9 +32,18 @@ std::string Request::getParam(const std::string& key) const {
     return (it != params_.end()) ? it->second : "";
 }
 
-std::unique_ptr<Core::Json::JsonValue> Request::getJson() const {
-    // TODO: Implementar parser JSON
-    return nullptr;
+std::shared_ptr<Core::Json::JsonValue> Request::getJson() const {
+    if (body_.empty()) {
+        return nullptr;
+    }
+    
+    try {
+        // Retorna diretamente o shared_ptr (muito mais simples!)
+        return Core::Json::Json::parse(body_);
+    } catch (const std::exception& e) {
+        // Se o body não for um JSON válido, evitamos crash e retornamos nullptr
+        return nullptr;
+    }
 }
 
 std::string Request::methodToString() const {
@@ -41,7 +51,7 @@ std::string Request::methodToString() const {
         case Method::GET: return "GET";
         case Method::POST: return "POST";
         case Method::PUT: return "PUT";
-        case Method::DELETE: return "DELETE";
+        case Method::DEL: return "DELETE";
         case Method::PATCH: return "PATCH";
         case Method::OPTIONS: return "OPTIONS";
         case Method::HEAD: return "HEAD";
@@ -53,7 +63,7 @@ Method Request::parseMethod(const std::string& method) {
     if (method == "GET") return Method::GET;
     if (method == "POST") return Method::POST;
     if (method == "PUT") return Method::PUT;
-    if (method == "DELETE") return Method::DELETE;
+    if (method == "DELETE") return Method::DEL;
     if (method == "PATCH") return Method::PATCH;
     if (method == "OPTIONS") return Method::OPTIONS;
     if (method == "HEAD") return Method::HEAD;
@@ -73,4 +83,3 @@ void Request::addQuery(const std::string& key, const std::string& value) {
 }
 
 } // namespace Core::Http
-
