@@ -23,9 +23,9 @@ public:
     ) : id_(id), 
         userId_(userId),
         especialidades_(especialidades),
-        ativo_(true),
+        raioAtuacaoKm_(10.0),
         documentosVerificados_(false),
-        raioAtuacaoKm_(10.0) {}
+        ativo_(true) {}
 
     // Getters
     std::string getId() const { return id_; }

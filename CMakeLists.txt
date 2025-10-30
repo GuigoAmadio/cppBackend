@@ -349,6 +349,25 @@ set(CANDIDATURAS_SOURCES
     src/domains/candidaturas/controllers/CandidaturaController.cpp
 )
 
+# Leilões (Sealed Bids)
+set(LEILOES_SOURCES
+    # Repositories
+    src/domains/leiloes/repositories/LeilaoRepository.cpp
+    
+    # Use Cases
+    src/domains/leiloes/use_cases/CreateLeilaoUseCase.cpp
+)
+
+# Offers (Sealed Bids)
+set(OFFERS_SOURCES
+    # Repositories
+    src/domains/offers/repositories/OfferRepository.cpp
+    
+    # Use Cases
+    src/domains/offers/use_cases/CreateOfferUseCase.cpp
+    src/domains/offers/use_cases/AcceptOfferUseCase.cpp
+)
+
 # Main source
 set(MAIN_SOURCE
     src/main/main_new.cpp
@@ -388,6 +407,8 @@ add_executable(cppBackend
     ${FREELANCES_SOURCES}
     ${VAGAS_SOURCES}
     ${CANDIDATURAS_SOURCES}
+    ${LEILOES_SOURCES}
+    ${OFFERS_SOURCES}
 )
 
 # PostgreSQL

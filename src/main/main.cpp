@@ -1,3 +1,5 @@
+    using Domains::Leiloes::Controllers::LeilaoController;
+    using Domains::Offers::Controllers::OfferController;
 /**
  * 🚀 C++ Backend do ZERO
  * 
@@ -203,6 +205,23 @@ curl http://localhost:8080/api/users/123
         
         return Response(StatusCode::Created).json(*response);
     });
+    
+    // ==================== SEALED BIDS (LEILÕES & OFFERS) ====================
+    router.post("/leiloes", [](const Request& req) { return LeilaoController::create(req); });
+    
+    router.get("/leiloes", [](const Request& req) { return LeilaoController::list(req); });
+    
+    router.get("/leiloes/:id", [](const Request& req) { return LeilaoController::getById(req); });
+    
+    router.put("/leiloes/:id/fechar", [](const Request& req) { return LeilaoController::close(req); });
+    
+    router.post("/offers", [](const Request& req) { return OfferController::create(req); });
+    
+    router.get("/leiloes/:id/offers", [](const Request& req) { return OfferController::listForLeilao(req); });
+    
+    router.put("/offers/:id/shortlist", [](const Request& req) { return OfferController::setShortlist(req); });
+    
+    router.put("/offers/:id/aceitar", [](const Request& req) { return OfferController::accept(req); });
     
     // ==================== TESTE DE THREADING ====================
     router.get("/api/slow/:seconds", [](const Request& req) {

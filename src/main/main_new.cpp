@@ -21,6 +21,9 @@
 #include "../core/utils/MetricsCollector.hpp"
 #include "../core/utils/GlobalMetrics.hpp"
 #include "../core/database/Connection.hpp"
+#include "../core/database/GlobalPool.hpp"
+#include "../domains/leiloes/controllers/LeilaoController.hpp"
+#include "../domains/offers/controllers/OfferController.hpp"
 #include "../core/database/ConnectionPool.hpp"
 #include "../core/cache/RedisPool.hpp"
 #include "../core/cache/RedisCacheService.hpp"
@@ -371,6 +374,16 @@ void setupRoutes(Router& router, ConnectionPool& pool,
 )";
         return Response(StatusCode::OK).html(html);
     });
+
+    // ==================== SEALED BIDS (LEILÕES & OFFERS) ====================
+    router.post("/leiloes", [](const Request& req) { return Domains::Leiloes::Controllers::LeilaoController::create(req); });
+    router.get("/leiloes", [](const Request& req) { return Domains::Leiloes::Controllers::LeilaoController::list(req); });
+    router.get("/leiloes/:id", [](const Request& req) { return Domains::Leiloes::Controllers::LeilaoController::getById(req); });
+    router.put("/leiloes/:id/fechar", [](const Request& req) { return Domains::Leiloes::Controllers::LeilaoController::close(req); });
+    router.post("/offers", [](const Request& req) { return Domains::Offers::Controllers::OfferController::create(req); });
+    router.get("/leiloes/:id/offers", [](const Request& req) { return Domains::Offers::Controllers::OfferController::listForLeilao(req); });
+    router.put("/offers/:id/shortlist", [](const Request& req) { return Domains::Offers::Controllers::OfferController::setShortlist(req); });
+    router.put("/offers/:id/aceitar", [](const Request& req) { return Domains::Offers::Controllers::OfferController::accept(req); });
     
     
 
@@ -2852,7 +2865,7 @@ int main(int argc, char* argv[]) {
         
         // Subscribe to websocket broadcast channel
         bool subSuccess = globalRedisPubSub->subscribe("websocket:broadcast", 
-            [](const std::string& channel, const std::string& message) {
+            [](const std::string& /*channel*/, const std::string& message) {
                 // Quando recebemos mensagem via Pub/Sub, fazer broadcast local
                 if (globalWsManager) {
                     globalWsManager->broadcast(message);

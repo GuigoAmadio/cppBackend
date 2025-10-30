@@ -25,8 +25,8 @@ public:
         cnpj_(cnpj), 
         razaoSocial_(razaoSocial),
         coordenadas_(latitude, longitude),
-        ativo_(true),
-        documentosVerificados_(false) {}
+        documentosVerificados_(false),
+        ativo_(true) {}
 
     // Getters
     std::string getId() const { return id_; }
