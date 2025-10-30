@@ -1,0 +1,27 @@
+# ========================================
+# GRAFANA DATASOURCES
+# MoneyMaker C++ Backend - Prometheus
+# ========================================
+
+apiVersion: 1
+
+datasources:
+  # ===== PROMETHEUS - Main Datasource =====
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: "POST"
+    version: 1
+
+  # ===== LOKI (Opcional - para logs) =====
+  # - name: Loki
+  #   type: loki
+  #   access: proxy
+  #   url: http://loki:3100
+  #   editable: true
+  #   version: 1

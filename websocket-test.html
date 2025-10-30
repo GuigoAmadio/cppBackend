@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Test - C++ Backend</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 800px;
+        width: 100%;
+        padding: 30px;
+      }
+
+      h1 {
+        color: #667eea;
+        margin-bottom: 10px;
+        font-size: 28px;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+
+      .status {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        font-size: 14px;
+      }
+
+      .status.disconnected {
+        background: #fee;
+        color: #c33;
+      }
+
+      .status.connected {
+        background: #efe;
+        color: #3c3;
+      }
+
+      .status.connecting {
+        background: #ffe;
+        color: #cc3;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s;
+      }
+
+      button:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      input {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .messages {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+      }
+
+      .message {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .message.sent {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+      }
+
+      .message.received {
+        background: #f1f8e9;
+        border-left: 4px solid #8bc34a;
+      }
+
+      .message.system {
+        background: #fff3e0;
+        border-left: 4px solid #ff9800;
+        font-style: italic;
+      }
+
+      .message.error {
+        background: #ffebee;
+        border-left: 4px solid #f44336;
+      }
+
+      .timestamp {
+        color: #999;
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+      }
+
+      .stat {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #667eea;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔌 WebSocket Test</h1>
+      <p class="subtitle">C++ Backend - Real-time Communication</p>
+
+      <div>
+        <span id="status" class="status disconnected">● Desconectado</span>
+      </div>
+
+      <div class="controls">
+        <button id="connectBtn" onclick="connect()">Conectar</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>
+          Desconectar
+        </button>
+        <button onclick="sendPing()" id="pingBtn" disabled>Enviar Ping</button>
+        <button onclick="clearMessages()">Limpar Mensagens</button>
+      </div>
+
+      <div class="input-group">
+        <input
+          type="text"
+          id="messageInput"
+          placeholder="Digite uma mensagem..."
+          onkeypress="if(event.key==='Enter') sendMessage()"
+          disabled
+        />
+        <button onclick="sendMessage()" id="sendBtn" disabled>Enviar</button>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="message system">
+          <div class="timestamp">Sistema</div>
+          Aguardando conexão...
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="sentCount">0</div>
+          <div class="stat-label">Mensagens Enviadas</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="receivedCount">0</div>
+          <div class="stat-label">Mensagens Recebidas</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="latency">-</div>
+          <div class="stat-label">Latência (ms)</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let ws = null;
+      let sentCount = 0;
+      let receivedCount = 0;
+      let pingTime = 0;
+      let wsClient = null; // Cliente com reconexão automática
+
+      // ✅ CLASSE DE RECONEXÃO AUTOMÁTICA
+      class WebSocketClient {
+        constructor(url) {
+          this.url = url;
+          this.ws = null;
+          this.reconnectDelay = 1000; // 1 segundo inicial
+          this.maxReconnectDelay = 30000; // 30 segundos máximo
+          this.reconnectAttempts = 0;
+          this.isIntentionalClose = false;
+          this.reconnectTimer = null;
+
+          // Callbacks
+          this.onOpen = null;
+          this.onMessage = null;
+          this.onClose = null;
+          this.onError = null;
+        }
+
+        connect() {
+          console.log(
+            `[AutoReconnect] Tentativa ${
+              this.reconnectAttempts + 1
+            } de conexão...`
+          );
+
+          this.ws = new WebSocket(this.url);
+
+          this.ws.onopen = (event) => {
+            console.log("[AutoReconnect] ✅ Conectado!");
+            this.reconnectAttempts = 0;
+            this.reconnectDelay = 1000; // Reset delay
+
+            if (this.onOpen) this.onOpen(event);
+          };
+
+          this.ws.onmessage = (event) => {
+            if (this.onMessage) this.onMessage(event);
+          };
+
+          this.ws.onerror = (error) => {
+            console.error("[AutoReconnect] ❌ Erro:", error);
+            if (this.onError) this.onError(error);
+          };
+
+          this.ws.onclose = (event) => {
+            console.log(
+              "[AutoReconnect] 🔌 Desconectado - Código:",
+              event.code
+            );
+
+            if (this.onClose) this.onClose(event);
+
+            // Se foi fechamento intencional (usuário clicou em desconectar)
+            if (this.isIntentionalClose) {
+              console.log(
+                "[AutoReconnect] Fechamento intencional - não reconectar"
+              );
+              return;
+            }
+
+            // Senão, reconectar automaticamente!
+            this.scheduleReconnect();
+          };
+        }
+
+        scheduleReconnect() {
+          this.reconnectAttempts++;
+
+          console.log(
+            `[AutoReconnect] 🔄 Reconectando em ${this.reconnectDelay}ms... (tentativa ${this.reconnectAttempts})`
+          );
+
+          this.reconnectTimer = setTimeout(() => {
+            this.connect();
+          }, this.reconnectDelay);
+
+          // Exponential backoff: 1s → 2s → 4s → 8s → ... → max 30s
+          this.reconnectDelay = Math.min(
+            this.reconnectDelay * 2,
+            this.maxReconnectDelay
+          );
+        }
+
+        send(data) {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(data);
+            return true;
+          } else {
+            console.error(
+              "[AutoReconnect] Não conectado! Mensagem não enviada:",
+              data
+            );
+            return false;
+          }
+        }
+
+        disconnect() {
+          console.log("[AutoReconnect] Desconectando intencionalmente...");
+          this.isIntentionalClose = true;
+
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
+
+          if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+          }
+        }
+
+        getReadyState() {
+          return this.ws?.readyState ?? WebSocket.CLOSED;
+        }
+      }
+
+      function updateStatus(text, className) {
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = "● " + text;
+        statusEl.className = "status " + className;
+      }
+
+      function addMessage(text, type = "system") {
+        const messagesDiv = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message " + type;
+
+        const timestamp = new Date().toLocaleTimeString("pt-BR");
+        messageDiv.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                ${text}
+            `;
+
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function connect() {
+        if (wsClient && wsClient.getReadyState() === WebSocket.OPEN) {
+          addMessage("Já está conectado!", "system");
+          return;
+        }
+
+        updateStatus("Conectando...", "connecting");
+        addMessage("🔄 Conectando com RECONEXÃO AUTOMÁTICA...", "system");
+        addMessage("✨ Se desconectar, reconecta sozinho!", "system");
+        console.log("[WebSocket] Iniciando WebSocketClient com auto-reconexão");
+
+        // ✅ CRIAR CLIENTE COM RECONEXÃO AUTOMÁTICA
+        wsClient = new WebSocketClient("ws://localhost:8080/ws");
+
+        // Configurar callbacks
+        wsClient.onOpen = function (event) {
+          ws = wsClient.ws; // Para compatibilidade com código existente
+          updateStatus("Conectado", "connected");
+          addMessage("✅ Conexão WebSocket estabelecida!", "system");
+
+          // 🔍 LOGS DETALHADOS
+          console.log("[WebSocket] onopen:", {
+            timestamp: new Date().toISOString(),
+            readyState: ws.readyState,
+            protocol: ws.protocol,
+            extensions: ws.extensions,
+            url: ws.url,
+            bufferedAmount: ws.bufferedAmount,
+          });
+
+          document.getElementById("connectBtn").disabled = true;
+          document.getElementById("disconnectBtn").disabled = false;
+          document.getElementById("pingBtn").disabled = false;
+          document.getElementById("sendBtn").disabled = false;
+          document.getElementById("messageInput").disabled = false;
+          document.getElementById("messageInput").focus();
+        };
+
+        wsClient.onMessage = function (event) {
+          receivedCount++;
+          document.getElementById("receivedCount").textContent = receivedCount;
+
+          // 🔍 LOG DETALHADO DE MENSAGEM
+          console.log("[WebSocket] onmessage:", {
+            timestamp: new Date().toISOString(),
+            data: event.data,
+            type: typeof event.data,
+            size: event.data.length,
+          });
+
+          // Check if it's a pong response
+          if (event.data.startsWith("PONG:")) {
+            const latency = Date.now() - pingTime;
+            document.getElementById("latency").textContent = latency;
+            addMessage(`🏓 Pong recebido (${latency}ms)`, "received");
+          } else {
+            addMessage(`📩 ${event.data}`, "received");
+          }
+        };
+
+        wsClient.onError = function (error) {
+          // 🔍 LOG DETALHADO DE ERRO
+          console.error("[WebSocket] onerror:", {
+            timestamp: new Date().toISOString(),
+            error: error,
+            readyState: wsClient.getReadyState(),
+            url: wsClient.url,
+            type: error.type,
+            target: error.target,
+          });
+
+          addMessage("❌ Erro na conexão WebSocket", "error");
+          addMessage(
+            `⚠️ ReadyState: ${wsClient.getReadyState()} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`,
+            "error"
+          );
+        };
+
+        wsClient.onClose = function (event) {
+          updateStatus("Reconectando...", "connecting");
+
+          // 🔍 LOG DETALHADO DE FECHAMENTO
+          const closeReasons = {
+            1000: "Normal Closure",
+            1001: "Going Away (navegador fechou aba ou está saindo)",
+            1002: "Protocol Error",
+            1003: "Unsupported Data",
+            1005: "No Status Received",
+            1006: "Abnormal Closure (sem close frame - timeout ou erro de rede)",
+            1007: "Invalid Frame Payload Data",
+            1008: "Policy Violation",
+            1009: "Message Too Big",
+            1010: "Missing Extension",
+            1011: "Internal Error",
+            1015: "TLS Handshake Fail",
+          };
+
+          const reason = closeReasons[event.code] || "Unknown";
+
+          console.log("[WebSocket] onclose:", {
+            timestamp: new Date().toISOString(),
+            code: event.code,
+            reason: event.reason || reason,
+            wasClean: event.wasClean,
+            readyState: wsClient.getReadyState(),
+            url: wsClient.url,
+          });
+
+          addMessage(`🔌 Conexão fechada!`, "system");
+          addMessage(`📊 Código: ${event.code} - ${reason}`, "system");
+          addMessage(`🧹 Clean: ${event.wasClean ? "Sim" : "Não"}`, "system");
+          if (event.reason) {
+            addMessage(`💬 Motivo: ${event.reason}`, "system");
+          }
+
+          // NÃO desabilitar botões - vai reconectar automaticamente!
+          addMessage(`🔄 Reconectando automaticamente...`, "system");
+        };
+
+        // Iniciar conexão
+        wsClient.connect();
+      }
+
+      function disconnect() {
+        if (wsClient) {
+          addMessage("🔌 Desconectando MANUALMENTE (sem reconexão)", "system");
+          wsClient.disconnect();
+          wsClient = null;
+          ws = null;
+
+          document.getElementById("connectBtn").disabled = false;
+          document.getElementById("disconnectBtn").disabled = true;
+          document.getElementById("pingBtn").disabled = true;
+          document.getElementById("sendBtn").disabled = true;
+          document.getElementById("messageInput").disabled = true;
+          updateStatus("Desconectado", "disconnected");
+        }
+      }
+
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const message = input.value.trim();
+
+        if (!message) {
+          return;
+        }
+
+        if (!wsClient || wsClient.getReadyState() !== WebSocket.OPEN) {
+          addMessage("❌ Não conectado ao servidor", "error");
+          return;
+        }
+
+        if (wsClient.send(message)) {
+          sentCount++;
+          document.getElementById("sentCount").textContent = sentCount;
+          addMessage(`📤 ${message}`, "sent");
+          input.value = "";
+          input.focus();
+        }
+      }
+
+      function sendPing() {
+        if (!wsClient || wsClient.getReadyState() !== WebSocket.OPEN) {
+          addMessage("❌ Não conectado ao servidor", "error");
+          return;
+        }
+
+        pingTime = Date.now();
+        if (wsClient.send("PING")) {
+          sentCount++;
+          document.getElementById("sentCount").textContent = sentCount;
+          addMessage("🏓 Ping enviado...", "sent");
+        }
+      }
+
+      function clearMessages() {
+        document.getElementById("messages").innerHTML = "";
+        addMessage("Mensagens limpas", "system");
+      }
+
+      // Auto-connect on load
+      window.onload = function () {
+        addMessage(
+          'Página carregada. Clique em "Conectar" para iniciar.',
+          "system"
+        );
+      };
+    </script>
+  </body>
+</html>

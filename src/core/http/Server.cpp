@@ -4,11 +4,16 @@
 #include "Router.hpp"
 #include "../utils/Logger.hpp"
 #include "../utils/LoggerNew.hpp"
+#include "../websocket/WebSocketHandler.hpp"
 #include <iostream>
 #include <sstream>
 #include <cstring>
 #include <thread>
 #include <vector>
+#include <algorithm>
+
+// Referência externa ao handler global (definido em main_new.cpp)
+extern std::shared_ptr<Core::WebSocket::WebSocketHandler> globalWsHandler;
 
 namespace Core::Http {
 
@@ -153,7 +158,11 @@ void Server::acceptLoop() {
 }
 
 void Server::handleConnection(socket_t clientSocket) {
+    // LOG_DEBUG("[Server::handleConnection] ==================== INÍCIO ====================");
+    // LOG_DEBUG("[Server::handleConnection] Socket: " + std::to_string(clientSocket));
+    
     try {
+        // LOG_DEBUG("[Server::handleConnection] Calling parseRequest()...");
         // 1. Parsear request
         auto request = parseRequest(clientSocket);
         
@@ -164,18 +173,64 @@ void Server::handleConnection(socket_t clientSocket) {
         }
         
         Utils::Logger::info("📥 " + request->methodToString() + " " + request->getPath());
+        // LOG_DEBUG("[Server::handleConnection] Request parsed successfully!");
         
-        // 2. Rotear e processar
+        
+        // 2. ✅ CHECK WEBSOCKET UPGRADE ANTES DE PROCESSAR ROTA
+        std::string upgrade = request->getHeader("Upgrade");
+        std::string connection = request->getHeader("Connection");
+        
+        // Converter para lowercase para comparação case-insensitive
+        std::transform(upgrade.begin(), upgrade.end(), upgrade.begin(), ::tolower);
+        std::transform(connection.begin(), connection.end(), connection.begin(), ::tolower);
+        
+        // Se é WebSocket upgrade request
+        if (upgrade == "websocket" && connection.find("upgrade") != std::string::npos) {
+            LOG_INFO("🔌 WebSocket upgrade request detected on /ws endpoint!");
+            
+            // Verificar se o handler está disponível
+            if (globalWsHandler) {
+                LOG_INFO("📡 Attempting WebSocket handshake...");
+                
+                // Tentar fazer o upgrade (o handler vai enviar HTTP 101)
+                bool upgradeSuccess = globalWsHandler->handleUpgrade(clientSocket, *request);
+                
+                if (upgradeSuccess) {
+                    LOG_INFO("✅ WebSocket upgrade successful! Connection handed to WebSocketManager.");
+                    // ✅ NÃO FECHAR O SOCKET! WebSocketManager vai gerenciar
+                    return;
+                } else {
+                    LOG_ERROR("❌ WebSocket upgrade failed!");
+                    // Se falhar, continuar com processamento HTTP normal (vai retornar erro)
+                }
+            } else {
+                LOG_ERROR("❌ WebSocket handler not available!");
+                // Se não tem handler, retornar erro
+                Response wsErrorResponse(StatusCode::InternalServerError);
+                wsErrorResponse.text("WebSocket handler not initialized");
+                sendResponse(clientSocket, wsErrorResponse);
+                closeSocket(clientSocket);
+                return;
+            }
+        }
+        
+        // 3. Rotear e processar (HTTP normal)
         Response response;
         
+        // LOG_DEBUG("[Server] About to call router->handle()");
+        // LOG_DEBUG("[Server] router_ is " + std::string(router_ ? "NOT NULL" : "NULL"));
+        
         if (router_) {
+            // LOG_DEBUG("[Server] Calling router_->handle()...");
             response = router_->handle(*request);
+            // LOG_DEBUG("[Server] router_->handle() returned with status: " + std::to_string((int)response.getStatus()));
         } else {
+            Utils::Logger::error("[Server] NO ROUTER CONFIGURED!");
             response = Response(StatusCode::NotImplemented)
                 .text("No router configured");
         }
         
-        // 3. Enviar response
+        // 4. Enviar response
         sendResponse(clientSocket, response);
         
         Utils::Logger::info("📤 " + std::to_string((int)response.getStatus()) + " " + 
@@ -190,7 +245,7 @@ void Server::handleConnection(socket_t clientSocket) {
         sendResponse(clientSocket, errorResponse);
     }
     
-    // 4. Fechar conexão
+    // 5. Fechar conexão (APENAS se não for WebSocket upgrade)
     closeSocket(clientSocket);
 }
 
@@ -210,19 +265,35 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     // Parsear manualmente!
     std::string rawRequest(buffer, bytesReceived);
     
-    LOG_DEBUG("First recv() - bytes received: " + std::to_string(bytesReceived));
+    // LOG_DEBUG("First recv() - bytes received: " + std::to_string(bytesReceived));
     
     std::istringstream stream(rawRequest);
     
     auto request = std::make_unique<Request>();
     
     // Parsear primeira linha: "GET /path HTTP/1.1"
-    std::string methodStr, path, version;
-    stream >> methodStr >> path >> version;
+    std::string methodStr, fullPath, version;
+    stream >> methodStr >> fullPath >> version;
+    
+    // Separar path de query params (ex: /api/products/search?q=Dell -> /api/products/search)
+    std::string path = fullPath;
+    std::string queryString;
+    size_t queryPos = fullPath.find('?');
+    if (queryPos != std::string::npos) {
+        path = fullPath.substr(0, queryPos);
+        queryString = fullPath.substr(queryPos + 1); // Extrair query string (depois do '?')
+    }
     
     request->setMethod(Request::parseMethod(methodStr));
     request->setPath(path);
     request->setVersion(version);
+    
+    // Debug: log query string parsing
+    if (!queryString.empty()) {
+        Utils::LoggerNew::debug("Query string detected: " + queryString, __FILE__, __LINE__);
+    }
+    
+    request->setQueryString(queryString);  // Armazenar query string no request
     
     // Parsear headers
     std::string line;
@@ -254,21 +325,21 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
     // Verificar Content-Length header
     std::string contentLengthStr = request->getHeader("Content-Length");
     
-    // DEBUG LOG: Log do raw request
-    LOG_DEBUG("=== RAW REQUEST DEBUG ===");
-    LOG_DEBUG("Total rawRequest size: " + std::to_string(rawRequest.length()));
-    LOG_DEBUG("Content-Length header: " + contentLengthStr);
-    
-    // Log primeiros 500 caracteres do rawRequest
-    if (rawRequest.length() > 0) {
-        size_t previewLen = std::min(rawRequest.length(), size_t(500));
-        LOG_DEBUG("Raw request preview (first " + std::to_string(previewLen) + " chars): " + rawRequest.substr(0, previewLen));
-    }
+    // DEBUG LOG: Log do raw request (COMMENTED FOR PRODUCTION)
+    // LOG_DEBUG("=== RAW REQUEST DEBUG ===");
+    // LOG_DEBUG("Total rawRequest size: " + std::to_string(rawRequest.length()));
+    // LOG_DEBUG("Content-Length header: " + contentLengthStr);
+    // 
+    // // Log primeiros 500 caracteres do rawRequest
+    // if (rawRequest.length() > 0) {
+    //     size_t previewLen = std::min(rawRequest.length(), size_t(500));
+    //     LOG_DEBUG("Raw request preview (first " + std::to_string(previewLen) + " chars): " + rawRequest.substr(0, previewLen));
+    // }
     
     if (!contentLengthStr.empty()) {
         try {
             int contentLength = std::stoi(contentLengthStr);
-            LOG_DEBUG("Parsed Content-Length: " + std::to_string(contentLength));
+            // LOG_DEBUG("Parsed Content-Length: " + std::to_string(contentLength));
             
             if (contentLength > 0) {
                 // Calcular posição atual no buffer
@@ -279,24 +350,24 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
                 
                 // Pegar o body do rawRequest original
                 size_t bodyStartPos = rawRequest.find("\r\n\r\n");
-                LOG_DEBUG("Body start position: " + std::to_string(bodyStartPos));
+                // LOG_DEBUG("Body start position: " + std::to_string(bodyStartPos));
                 
                 if (bodyStartPos != std::string::npos) {
                     bodyStartPos += 4;  // Pular "\r\n\r\n"
-                    LOG_DEBUG("Body start (after \\r\\n\\r\\n): " + std::to_string(bodyStartPos));
+                    // LOG_DEBUG("Body start (after \\r\\n\\r\\n): " + std::to_string(bodyStartPos));
                     
                     if (bodyStartPos < rawRequest.length()) {
                         std::string body = rawRequest.substr(bodyStartPos);
-                        LOG_DEBUG("Body extracted (length=" + std::to_string(body.length()) + "): " + body);
+                        // LOG_DEBUG("Body extracted (length=" + std::to_string(body.length()) + "): " + body);
                         
                         // Limitar ao Content-Length
                         if (body.length() > static_cast<size_t>(contentLength)) {
                             body = body.substr(0, contentLength);
-                            LOG_DEBUG("Body trimmed to Content-Length: " + body);
+                            // LOG_DEBUG("Body trimmed to Content-Length: " + body);
                         }
                         
                         request->setBody(body);
-                        LOG_DEBUG("Body set successfully!");
+                        // LOG_DEBUG("Body set successfully!");
                     } else {
                         // Body não veio no primeiro recv(), precisamos ler mais!
                         LOG_WARNING("Body not in first packet! Body should start at " + std::to_string(bodyStartPos) + 
@@ -324,15 +395,15 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
                             body.append(bodyBuffer, bodyBytesReceived);
                             totalBodyReceived += bodyBytesReceived;
                             
-                            LOG_DEBUG("Body chunk received: " + std::to_string(bodyBytesReceived) + 
-                                     " bytes (total: " + std::to_string(totalBodyReceived) + "/" + 
-                                     std::to_string(contentLength) + ")");
+                            // LOG_DEBUG("Body chunk received: " + std::to_string(bodyBytesReceived) + 
+                            //          " bytes (total: " + std::to_string(totalBodyReceived) + "/" + 
+                            //          std::to_string(contentLength) + ")");
                         }
                         
                         if (totalBodyReceived == contentLength) {
-                            LOG_INFO("Body successfully read from second recv(): " + body);
+                            // LOG_INFO("Body successfully read from second recv(): " + body);
                             request->setBody(body);
-                            LOG_DEBUG("Body set successfully!");
+                            // LOG_DEBUG("Body set successfully!");
                         } else {
                             LOG_ERROR("Failed to read complete body! Expected " + std::to_string(contentLength) + 
                                      " bytes, got " + std::to_string(totalBodyReceived));
@@ -342,23 +413,22 @@ std::unique_ptr<Request> Server::parseRequest(socket_t socket) {
                     LOG_WARNING("Could not find \\r\\n\\r\\n separator in raw request!");
                 }
             } else {
-                LOG_DEBUG("Content-Length is 0 or negative, skipping body parsing");
+                // LOG_DEBUG("Content-Length is 0 or negative, skipping body parsing");
             }
         } catch (const std::exception& e) {
             LOG_ERROR("Error parsing Content-Length: " + std::string(e.what()));
         }
     } else {
-        LOG_DEBUG("No Content-Length header found");
+        // LOG_DEBUG("No Content-Length header found");
     }
     
-    LOG_DEBUG("=== END RAW REQUEST DEBUG ===");
+    // LOG_DEBUG("=== END RAW REQUEST DEBUG ===");
     
     return request;
 }
 
 void Server::sendResponse(socket_t socket, const Response& response) {
     std::string responseStr = response.toString();
-    
     send(socket, responseStr.c_str(), responseStr.length(), 0);
 }
 

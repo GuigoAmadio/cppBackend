@@ -1,0 +1,64 @@
+﻿// ============================================
+// ADICIONAR APÓS OS INCLUDES DO INVOICING:
+// ============================================
+
+#include "../domains/task/repositories/impl/TaskRepositoryImpl.hpp"
+#include "../domains/task/controllers/TaskController.hpp"
+
+// ============================================
+// ADICIONAR APÓS invoiceRepository:
+// ============================================
+
+    // Task Repository
+    auto taskRepository = std::make_shared<Domain::Task::TaskRepositoryImpl>(pool);
+    
+    // Task Controller
+    auto taskController = std::make_shared<Domain::Task::TaskController>(taskRepository);
+
+// ============================================
+// ADICIONAR AS ROTAS (após rotas de invoice):
+// ============================================
+
+    // Task Management Routes
+    router->post("/api/tasks", authMiddleware, [taskController](const Request& req) {
+        return taskController->createTask(req);
+    });
+    
+    router->get("/api/tasks/:id", authMiddleware, [taskController](const Request& req) {
+        return taskController->getTask(req);
+    });
+    
+    router->get("/api/tasks", authMiddleware, [taskController](const Request& req) {
+        return taskController->listTasks(req);
+    });
+    
+    router->put("/api/tasks/:id", authMiddleware, [taskController](const Request& req) {
+        return taskController->updateTask(req);
+    });
+    
+    router->del("/api/tasks/:id", authMiddleware, [taskController](const Request& req) {
+        return taskController->deleteTask(req);
+    });
+    
+    router->put("/api/tasks/:id/status", authMiddleware, [taskController](const Request& req) {
+        return taskController->updateStatus(req);
+    });
+    
+    router->post("/api/tasks/:id/comments", authMiddleware, [taskController](const Request& req) {
+        return taskController->addComment(req);
+    });
+    
+    router->get("/api/tasks/:id/comments", authMiddleware, [taskController](const Request& req) {
+        return taskController->getComments(req);
+    });
+    
+    router->post("/api/tasks/:id/checklists", authMiddleware, [taskController](const Request& req) {
+        return taskController->addChecklist(req);
+    });
+    
+    router->get("/api/tasks/:id/checklists", authMiddleware, [taskController](const Request& req) {
+        return taskController->getChecklists(req);
+    });
+    
+    Utils::Logger::info(" Task routes registered (10 endpoints)");
+

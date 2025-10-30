@@ -146,6 +146,35 @@ public:
      * @brief Define a versão do HTTP.
      */
     void setVersion(const std::string& version) { version_ = version; }
+    
+    /**
+     * @brief Define e parsea a query string (ex: "q=Dell&limit=10")
+     */
+    void setQueryString(const std::string& queryString) {
+        if (queryString.empty()) return;
+        
+        // Parsear query string: param1=value1&param2=value2
+        size_t pos = 0;
+        std::string qs = queryString;
+        
+        while (pos < qs.length()) {
+            size_t ampPos = qs.find('&', pos);
+            if (ampPos == std::string::npos) {
+                ampPos = qs.length();
+            }
+            
+            std::string param = qs.substr(pos, ampPos - pos);
+            size_t eqPos = param.find('=');
+            
+            if (eqPos != std::string::npos) {
+                std::string key = param.substr(0, eqPos);
+                std::string value = param.substr(eqPos + 1);
+                query_[key] = value;
+            }
+            
+            pos = ampPos + 1;
+        }
+    }
 
     /**
      * @brief Define o corpo da requisição.

@@ -2,6 +2,9 @@
 #include "../utils/Logger.hpp"
 #include <sstream>
 
+// Macro LOG_DEBUG
+#define LOG_DEBUG(msg) Utils::Logger::debug(msg)
+
 namespace Core::Http {
 
 Route::Route(Method m, const std::string& p, Handler h)
@@ -78,18 +81,40 @@ void Router::patch(const std::string& pattern, Handler handler) {
 void Router::route(Method method, const std::string& pattern, Handler handler) {
     routes_.emplace_back(method, pattern, handler);
     
-    Utils::Logger::debug("Rota registrada: " + 
-                        Request().methodToString() + " " + pattern);
+    std::string methodStr = "UNKNOWN";
+    if (method == Method::GET) methodStr = "GET";
+    else if (method == Method::POST) methodStr = "POST";
+    else if (method == Method::PUT) methodStr = "PUT";
+    else if (method == Method::DEL) methodStr = "DELETE";
+    else if (method == Method::PATCH) methodStr = "PATCH";
+    
+    Utils::Logger::info("[Router::route] this=" + std::to_string(reinterpret_cast<uintptr_t>(this)) + 
+                       " | Rota #" + std::to_string(routes_.size()) + " registrada: " + methodStr + " " + pattern);
 }
 
 Response Router::handle(const Request& request) {
+    // LOG IMEDIATO no início
+    // Utils::Logger::info("🔵 [Router::handle] ========== CHAMADO! ==========");
+    
     try {
         Response response;
         auto& req = const_cast<Request&>(request);
         
+        // Utils::Logger::info("🔵 [Router] handle() called for: " + req.methodToString() + " " + req.getPath());
+        // Utils::Logger::info("🔵 [Router] middlewareChain_ is " + std::string(middlewareChain_ ? "NOT NULL" : "NULL"));
+        
         // Se tem MiddlewareChain v2.0, usar ela
+        // Utils::Logger::info("🔵 [Router] Checking if middlewareChain_...");
         if (middlewareChain_) {
+            // Utils::Logger::info("🔵🔵🔵 [Router] ENTRANDO NO IF! Using MiddlewareChain v2.0");
+            // Utils::Logger::info("🔵 [Router] MiddlewareChain size: " + std::to_string(middlewareChain_->size()));
             middlewareChain_->execute(req, response, [&]() {
+                // Utils::Logger::info("🔵 [Router] Inside MiddlewareChain finalHandler");
+                
+                // SALVAR headers setados pelos middlewares (especialmente CORS!)
+                auto middlewareHeaders = response.getHeaders();
+                // Utils::Logger::info("🔵 [Router] Salvando " + std::to_string(middlewareHeaders.size()) + " headers dos middlewares");
+                
                 // Executar middlewares legados
                 for (auto& middleware : middlewares_) {
                     Response tempResponse;
@@ -114,13 +139,20 @@ Response Router::handle(const Request& request) {
                     req.addParam(key, value);
                 }
                 
-                // Executar handler
-                response = route->handler(request);
-            });
-            
-            return response;
-        } else {
-            // Sistema legado (sem MiddlewareChain)
+                    // Executar handler (retorna NOVA response, perdendo headers do middleware!)
+                    response = route->handler(request);
+                    
+                    // RESTAURAR headers dos middlewares (CORS, etc)
+                    for (const auto& [name, value] : middlewareHeaders) {
+                        // Só restaurar se o handler não sobrescreveu
+                        if (response.getHeaders().find(name) == response.getHeaders().end()) {
+                            response.setHeader(name, value);
+                        }
+                    }
+                });
+                
+                return response;
+            } else {
             // Executar middlewares
             for (auto& middleware : middlewares_) {
                 if (!middleware(req, response)) {
@@ -157,11 +189,20 @@ void Router::use(Middleware middleware) {
 
 const Route* Router::findRoute(const Request& request,
                                std::unordered_map<std::string, std::string>& params) const {
+    // Utils::Logger::info("[Router::findRoute] Procurando rota para: " + 
+    //                    const_cast<Request&>(request).methodToString() + " " + request.getPath() + 
+    //                    " | Total de rotas: " + std::to_string(routes_.size()));
+    
+    int count = 0;
     for (const auto& route : routes_) {
+        count++;
         if (route.matches(request, params)) {
+            // Utils::Logger::info("[Router::findRoute] MATCH encontrado na rota #" + std::to_string(count) + ": " + route.pattern);
             return &route;
         }
     }
+    
+    Utils::Logger::info("[Router::findRoute] ❌ Nenhuma rota encontrada para: " + request.getPath());
     return nullptr;
 }
 

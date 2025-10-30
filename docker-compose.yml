@@ -1,23 +1,273 @@
 version: "3.8"
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: cppbackend_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+  # ==================== BACKEND C++ ====================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moneymaker-backend
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "8080:8080"
+    environment:
+      - DOCKER_CONTAINER=true
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=moneymaker_dev
+      - DB_USER=moneymaker_user
+      - DB_PASSWORD=postgre123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-supersecretkey123456}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+
+  # ==================== POSTGRESQL ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: moneymaker-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=moneymaker_dev
+      - POSTGRES_USER=moneymaker_user
+      - POSTGRES_PASSWORD=postgre123
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./schemas:/docker-entrypoint-initdb.d:ro
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneymaker_user -d moneymaker_dev"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "work_mem=16MB"
+
+  # ==================== REDIS ====================
+  redis:
+    image: redis:7-alpine
+    container_name: moneymaker-redis
+    ports:
+      - "6379:6379"
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--appendfsync"
+      - "everysec"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    volumes:
+      - redis-data:/data
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ==================== PROMETHEUS ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: moneymaker-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    depends_on:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== GRAFANA ====================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: moneymaker-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== NODE EXPORTER (System Metrics) - DESABILITADO (WSL2 incompatibility) ====================
+  # node-exporter:
+  #   image: prom/node-exporter:v1.8.2
+  #   container_name: moneymaker-node-exporter
+  #   ports:
+  #     - "9100:9100"
+  #   command:
+  #     - "--path.procfs=/host/proc"
+  #     - "--path.sysfs=/host/sys"
+  #     - "--no-collector.filesystem"
+  #     - "--no-collector.mountstats"
+  #     - "--web.max-requests=40"
+  #   volumes:
+  #     - /proc:/host/proc:ro
+  #     - /sys:/host/sys:ro
+  #     - /:/rootfs:ro
+  #   networks:
+  #     - moneymaker-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD",
+  #         "wget",
+  #         "--quiet",
+  #         "--tries=1",
+  #         "--spider",
+  #         "http://localhost:9100/metrics",
+  #       ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # ==================== REDIS EXPORTER (Redis Metrics) ====================
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: moneymaker-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_EXPORTER_CHECK_KEYS=*
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    depends_on:
+      - redis
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9121/metrics",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== POSTGRES EXPORTER (DB Metrics) ====================
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: moneymaker-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://moneymaker_user:postgre123@postgres:5432/moneymaker_dev?sslmode=disable
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    networks:
+      - moneymaker-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9187/metrics",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  moneymaker-network:
+    driver: bridge
+    name: moneymaker-network
 
 volumes:
-  postgres_data:
-    driver: local
+  postgres-data:
+    name: moneymaker-postgres-data
+  redis-data:
+    name: moneymaker-redis-data
+  prometheus-data:
+    name: moneymaker-prometheus-data
+  grafana-data:
+    name: moneymaker-grafana-data

@@ -27,6 +27,28 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 # Find Threads (pthread)
 find_package(Threads REQUIRED)
 
+# Find hiredis (Redis client)
+find_library(HIREDIS_LIB NAMES hiredis libhiredis PATHS 
+    "C:/msys64/ucrt64/lib"
+    "/ucrt64/lib"
+    "/usr/lib"
+    "/usr/lib/x86_64-linux-gnu"
+    "/usr/local/lib"
+    REQUIRED
+)
+if(NOT HIREDIS_LIB)
+    message(FATAL_ERROR "hiredis library not found")
+endif()
+message(STATUS "Found hiredis: ${HIREDIS_LIB}")
+
+# hiredis include directory
+include_directories(
+    "C:/msys64/ucrt64/include"
+    "/usr/include"
+    "/usr/local/include"
+)
+include_directories("/ucrt64/include")
+
 # Source files - HTTP Core (FUNCIONAL)
 set(CORE_SOURCES
     src/core/http/Server.cpp
@@ -34,11 +56,15 @@ set(CORE_SOURCES
     src/core/http/Response.cpp
     src/core/http/Router.cpp
     src/core/http/Middleware.cpp
-    src/core/http/TenantMiddleware.cpp
-    src/core/http/AuthMiddleware.cpp
-    src/core/http/RoleMiddleware.cpp
-    src/core/http/RateLimitMiddleware.cpp
-    src/core/http/MetricsMiddleware.cpp
+)
+
+# Middleware sources
+set(MIDDLEWARE_SOURCES
+    src/infrastructure/middleware/TenantMiddleware.cpp
+    src/infrastructure/middleware/AuthMiddleware.cpp
+    src/infrastructure/middleware/RoleMiddleware.cpp
+    src/infrastructure/middleware/RateLimitMiddleware.cpp
+    src/infrastructure/middleware/MetricsMiddleware.cpp
 )
 
 # Source files - JSON (IMPLEMENTADO)
@@ -61,55 +87,266 @@ set(UTILS_SOURCES
     src/core/utils/MetricsCollector.cpp
 )
 
+# Cache sources (Redis)
+set(CACHE_SOURCES
+    src/core/cache/RedisClient.cpp
+    src/core/cache/RedisPool.cpp
+    src/core/cache/RedisCacheService.cpp
+    src/core/cache/RedisPubSub.cpp
+)
+
+# WebSocket sources
+set(WEBSOCKET_SOURCES
+    src/core/websocket/WebSocketFrame.cpp
+    src/core/websocket/WebSocketConnection.cpp
+    src/core/websocket/WebSocketManager.cpp
+    src/core/websocket/WebSocketHandler.cpp
+)
+
+# Message Queue sources (Redis Streams)
+set(QUEUE_SOURCES
+    src/core/queue/RedisMessageQueue.cpp
+    src/core/queue/QueueWorker.cpp
+)
+
 # Database sources
 set(DATABASE_SOURCES
     src/core/database/Connection.cpp
     src/core/database/ConnectionPool.cpp
 )
 
-# Identity Domain sources (DDD)
-set(IDENTITY_SOURCES
+# IAM Domain sources (Identity & Access Management)
+set(IAM_SOURCES
     # Value Objects
-    src/domains/identity/value_objects/Email.cpp
-    src/domains/identity/value_objects/Password.cpp
-    
-    # Entities
-    src/domains/identity/entities/User.cpp
-    src/domains/identity/entities/Tenant.cpp
-    src/domains/identity/entities/AuditLog.cpp
-    
-    # Repositories
-    src/domains/identity/repositories/UserRepository.cpp
-    src/domains/identity/repositories/TenantRepository.cpp
-    src/domains/identity/repositories/EmailVerificationRepository.cpp
-    src/domains/identity/repositories/PasswordResetRepository.cpp
-    src/domains/identity/repositories/AuditLogRepository.cpp
+    src/domains/iam/value_objects/Email.cpp
+    src/domains/iam/value_objects/Password.cpp
     
     # Services
-    src/domains/identity/services/JwtService.cpp
-    src/domains/identity/services/BcryptService.cpp
-    src/domains/identity/services/EmailService.cpp
+    src/domains/iam/services/JwtService.cpp
+    src/domains/iam/services/BcryptService.cpp
     
     # Use Cases
-    src/domains/identity/use_cases/RegisterUserUseCase.cpp
-    src/domains/identity/use_cases/LoginUserUseCase.cpp
-    src/domains/identity/use_cases/GetUserUseCase.cpp
-    src/domains/identity/use_cases/UpdateUserUseCase.cpp
-    src/domains/identity/use_cases/ChangePasswordUseCase.cpp
-    src/domains/identity/use_cases/DeleteUserUseCase.cpp
-    src/domains/identity/use_cases/ListUsersUseCase.cpp
-    src/domains/identity/use_cases/ListTenantMembersUseCase.cpp
-    src/domains/identity/use_cases/UpdateUserRoleUseCase.cpp
-    src/domains/identity/use_cases/RemoveUserFromTenantUseCase.cpp
-    src/domains/identity/use_cases/AddUserToTenantUseCase.cpp
-    src/domains/identity/use_cases/RefreshTokenUseCase.cpp
-    src/domains/identity/use_cases/SendVerificationEmailUseCase.cpp
-    src/domains/identity/use_cases/VerifyEmailUseCase.cpp
-    src/domains/identity/use_cases/RequestPasswordResetUseCase.cpp
-    src/domains/identity/use_cases/ResetPasswordUseCase.cpp
+    src/domains/iam/use_cases/RegisterUserUseCase.cpp
+    src/domains/iam/use_cases/LoginUserUseCase.cpp
+    src/domains/iam/use_cases/RefreshTokenUseCase.cpp
+    src/domains/iam/use_cases/VerifyEmailUseCase.cpp
     
     # Controllers
-    src/domains/identity/controllers/AuthController.cpp
+    src/domains/iam/controllers/AuthController.cpp
+)
+
+# User Management Domain sources
+set(USER_MANAGEMENT_SOURCES
+    # Entities
+    src/domains/user_management/entities/User.cpp
+    
+    # Repositories
+    src/domains/user_management/repositories/UserRepository.cpp
+    
+    # Use Cases
+    src/domains/user_management/use_cases/GetUserUseCase.cpp
+    src/domains/user_management/use_cases/UpdateUserUseCase.cpp
+    src/domains/user_management/use_cases/ChangePasswordUseCase.cpp
+    src/domains/user_management/use_cases/DeleteUserUseCase.cpp
+    src/domains/user_management/use_cases/ListUsersUseCase.cpp
+)
+
+# Tenant Management Domain sources
+set(TENANT_MANAGEMENT_SOURCES
+    # Entities
+    src/domains/tenant_management/entities/Tenant.cpp
+    
+    # Repositories
+    src/domains/tenant_management/repositories/TenantRepository.cpp
+    
+    # Use Cases
+    src/domains/tenant_management/use_cases/ListTenantMembersUseCase.cpp
+    src/domains/tenant_management/use_cases/UpdateUserRoleUseCase.cpp
+    src/domains/tenant_management/use_cases/RemoveUserFromTenantUseCase.cpp
+    src/domains/tenant_management/use_cases/AddUserToTenantUseCase.cpp
+)
+
+# Audit Domain sources
+set(AUDIT_SOURCES
+    # Entities
+    src/domains/audit/entities/AuditLog.cpp
+    
+    # Repositories
+    src/domains/audit/repositories/AuditLogRepository.cpp
+)
+
+# Notification Domain sources
+set(NOTIFICATION_SOURCES
+    # Services
+    src/domains/notification/services/EmailService.cpp
+    src/domains/notification/services/EmailVerificationRepository.cpp
+    src/domains/notification/services/PasswordResetRepository.cpp
+    
+    # Use Cases
+    src/domains/notification/use_cases/SendVerificationEmailUseCase.cpp
+    src/domains/notification/use_cases/RequestPasswordResetUseCase.cpp
+    src/domains/notification/use_cases/ResetPasswordUseCase.cpp
+)
+
+# Workspace Domain sources
+set(WORKSPACE_SOURCES
+    # Repositories
+    src/domains/workspace/repositories/WorkspaceRepository.cpp
+    
+    # Controllers
+    src/domains/workspace/controllers/WorkspaceController.cpp
+)
+
+# Product Domain sources
+set(PRODUCT_SOURCES
+    # Repositories
+    src/domains/product/repositories/ProductRepository.cpp
+    
+    # Controllers
+    src/domains/product/controllers/ProductController.cpp
+)
+
+# Inventory Domain sources
+set(INVENTORY_SOURCES
+    # Repositories
+    src/domains/inventory/repositories/InventoryRepository.cpp
+    
+    # Controllers
+    src/domains/inventory/controllers/InventoryController.cpp
+)
+
+# Customer Domain sources
+set(CUSTOMER_SOURCES
+    # Repositories
+    src/domains/customer/repositories/CustomerRepository.cpp
+    
+    # Controllers
+    src/domains/customer/controllers/CustomerController.cpp
+)
+
+# Category Domain sources
+set(CATEGORY_SOURCES
+    # Repositories
+    src/domains/category/repositories/CategoryRepository.cpp
+    
+    # Controllers
+    src/domains/category/controllers/CategoryController.cpp
+)
+
+# Order Domain sources
+set(ORDER_SOURCES
+    # Repositories
+    src/domains/order/repositories/OrderRepository.cpp
+    
+    # Controllers
+    src/domains/order/controllers/OrderController.cpp
+)
+
+# Payment Domain sources
+set(PAYMENT_SOURCES
+    # Repositories
+    src/domains/payment/repositories/PaymentRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/payment/controllers/PaymentController.cpp
+)
+
+# Subscription sources
+set(SUBSCRIPTION_SOURCES
+    # Repositories
+    src/domains/subscription/repositories/impl/PlanRepositoryImpl.cpp
+    src/domains/subscription/repositories/impl/SubscriptionRepositoryImpl.cpp
+    src/domains/subscription/repositories/impl/BillingHistoryRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/subscription/controllers/SubscriptionController.cpp
+)
+
+# Invoicing sources
+set(INVOICING_SOURCES
+    # Repositories
+    src/domains/invoicing/repositories/impl/InvoiceRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/invoicing/controllers/InvoiceController.cpp
+)
+
+# Task Management Domain sources
+set(TASK_SOURCES
+    # Repositories
+    src/domains/task/repositories/impl/TaskRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/task/controllers/TaskController.cpp
+)
+
+# Database/Admin Domain sources
+set(DATABASE_ADMIN_SOURCES
+    # Validators
+    src/domains/database/validators/QueryValidator.cpp
+    
+    # Controllers
+    src/domains/database/controllers/DatabaseController.cpp
+)
+
+# Calendar Domain sources
+set(CALENDAR_SOURCES
+    # Repositories
+    src/domains/calendar/repositories/impl/EventRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/calendar/controllers/EventController.cpp
+)
+
+# Finance Domain sources
+set(FINANCE_SOURCES
+    # Repositories
+    src/domains/finance/repositories/impl/AccountRepositoryImpl.cpp
+    src/domains/finance/repositories/impl/TransactionRepositoryImpl.cpp
+    src/domains/finance/repositories/impl/CategoryRepositoryImpl.cpp
+    src/domains/finance/repositories/impl/BudgetRepositoryImpl.cpp
+    src/domains/finance/repositories/impl/ReconciliationRepositoryImpl.cpp
+    
+    # Controllers
+    src/domains/finance/controllers/FinanceController.cpp
+)
+
+# ==================== FREELANCER APP MODULES ====================
+
+# Restaurantes Domain sources
+set(RESTAURANTES_SOURCES
+    # Repositories
+    src/domains/restaurantes/repositories/RestauranteRepository.cpp
+    
+    # Controllers
+    src/domains/restaurantes/controllers/RestauranteController.cpp
+)
+
+# Freelances Domain sources
+set(FREELANCES_SOURCES
+    # Repositories
+    src/domains/freelances/repositories/FreelancerRepository.cpp
+    
+    # Controllers
+    src/domains/freelances/controllers/FreelancerController.cpp
+)
+
+# Vagas Domain sources
+set(VAGAS_SOURCES
+    # Repositories
+    src/domains/vagas/repositories/VagaRepository.cpp
+    
+    # Controllers
+    src/domains/vagas/controllers/VagaController.cpp
+)
+
+# Candidaturas Domain sources
+set(CANDIDATURAS_SOURCES
+    # Repositories
+    src/domains/candidaturas/repositories/CandidaturaRepository.cpp
+    
+    # Controllers
+    src/domains/candidaturas/controllers/CandidaturaController.cpp
 )
 
 # Main source
@@ -121,21 +358,50 @@ set(MAIN_SOURCE
 add_executable(cppBackend 
     ${MAIN_SOURCE}
     ${CORE_SOURCES}
+    ${MIDDLEWARE_SOURCES}
     ${JSON_SOURCES}
     ${THREADING_SOURCES}
     ${DATABASE_SOURCES}
     ${UTILS_SOURCES}
-    ${IDENTITY_SOURCES}
+    ${CACHE_SOURCES}
+    ${WEBSOCKET_SOURCES}
+    ${QUEUE_SOURCES}
+    ${IAM_SOURCES}
+    ${USER_MANAGEMENT_SOURCES}
+    ${TENANT_MANAGEMENT_SOURCES}
+    ${AUDIT_SOURCES}
+    ${NOTIFICATION_SOURCES}
+    ${WORKSPACE_SOURCES}
+    ${PRODUCT_SOURCES}
+    ${INVENTORY_SOURCES}
+    ${CUSTOMER_SOURCES}
+    ${CATEGORY_SOURCES}
+    ${ORDER_SOURCES}
+    ${PAYMENT_SOURCES}
+    ${SUBSCRIPTION_SOURCES}
+    ${INVOICING_SOURCES}
+    ${TASK_SOURCES}
+    ${DATABASE_ADMIN_SOURCES}
+    ${CALENDAR_SOURCES}
+    ${FINANCE_SOURCES}
+    ${RESTAURANTES_SOURCES}
+    ${FREELANCES_SOURCES}
+    ${VAGAS_SOURCES}
+    ${CANDIDATURAS_SOURCES}
 )
 
 # PostgreSQL
 find_library(LIBPQ_LIBRARY NAMES pq libpq PATHS 
     "C:/msys64/ucrt64/lib"
-    NO_DEFAULT_PATH
+    "/usr/lib"
+    "/usr/lib/x86_64-linux-gnu"
+    "/usr/local/lib"
 )
 find_path(LIBPQ_INCLUDE_DIR NAMES libpq-fe.h PATHS
     "C:/msys64/ucrt64/include"
-    NO_DEFAULT_PATH
+    "/usr/include"
+    "/usr/include/postgresql"
+    "/usr/local/include"
 )
 
 if(LIBPQ_LIBRARY AND LIBPQ_INCLUDE_DIR)
@@ -148,11 +414,14 @@ endif()
 # OpenSSL (for JWT and Bcrypt)
 find_library(OPENSSL_CRYPTO_LIBRARY NAMES crypto libcrypto PATHS 
     "C:/msys64/ucrt64/lib"
-    NO_DEFAULT_PATH
+    "/usr/lib"
+    "/usr/lib/x86_64-linux-gnu"
+    "/usr/local/lib"
 )
 find_path(OPENSSL_INCLUDE_DIR NAMES openssl/evp.h PATHS
     "C:/msys64/ucrt64/include"
-    NO_DEFAULT_PATH
+    "/usr/include"
+    "/usr/local/include"
 )
 
 if(OPENSSL_CRYPTO_LIBRARY AND OPENSSL_INCLUDE_DIR)
@@ -173,6 +442,11 @@ endif()
 
 if(OPENSSL_CRYPTO_LIBRARY)
     target_link_libraries(cppBackend ${OPENSSL_CRYPTO_LIBRARY})
+endif()
+
+# hiredis (Redis)
+if(HIREDIS_LIB)
+    target_link_libraries(cppBackend ${HIREDIS_LIB})
 endif()
 
 # Se Windows, adicionar Winsock

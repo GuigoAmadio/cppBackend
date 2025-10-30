@@ -1,0 +1,260 @@
+[2025-10-23 13:36:08.775] [32m[INFO ][0m [90m[main_new.cpp:2287][0m ═══════════════════════════════════════
+[2025-10-23 13:36:08.783] [32m[INFO ][0m [90m[main_new.cpp:2288][0m   🚀 C++ BACKEND v2.0
+[2025-10-23 13:36:08.790] [32m[INFO ][0m [90m[main_new.cpp:2289][0m   ✅ ConnectionPool
+[2025-10-23 13:36:08.792] [32m[INFO ][0m [90m[main_new.cpp:2290][0m   ✅ Middleware System
+[2025-10-23 13:36:08.798] [32m[INFO ][0m [90m[main_new.cpp:2291][0m   ✅ Logger melhorado
+[2025-10-23 13:36:08.800] [32m[INFO ][0m [90m[main_new.cpp:2292][0m ═══════════════════════════════════════
+[2025-10-23 13:36:08.814] [32m[INFO ][0m [90m[main_new.cpp:2295][0m Criando MetricsCollector...
+[2025-10-23 13:36:08.816] [32m[INFO ][0m [90m[MetricsCollector.cpp:9][0m MetricsCollector initialized
+[2025-10-23 13:36:08.821] [32m[INFO ][0m [90m[main_new.cpp:2298][0m Criando connection pool...
+[2025-10-23 13:36:08] [INFO]  🏊 Criando connection pool (min=2, max=10)
+[2025-10-23 13:36:09] [INFO]  🐘 PostgreSQL conectado com sucesso
+[2025-10-23 13:36:09] [INFO]  🐘 PostgreSQL conectado com sucesso
+[2025-10-23 13:36:09] [INFO]  ✅ Connection pool criado com 2 conexões
+[2025-10-23 13:36:09.550] [32m[INFO ][0m [90m[main_new.cpp:2310][0m ✅ Connection pool criado!
+[2025-10-23 13:36:09.551] [32m[INFO ][0m [90m[main_new.cpp:2313][0m 🔴 Initializing Redis...
+[2025-10-23 13:36:09.551] [32m[INFO ][0m [90m[RedisPool.cpp:13][0m RedisPool: Initializing pool with 10 connections
+[2025-10-23 13:36:09.555] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.564] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.566] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.580] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.596] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.599] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.601] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.614] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.635] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.653] [32m[INFO ][0m [90m[RedisClient.cpp:29][0m Redis: Connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.655] [32m[INFO ][0m [90m[RedisPool.cpp:31][0m RedisPool: Initialized with 10 connections
+[2025-10-23 13:36:09.656] [32m[INFO ][0m [90m[RedisCacheService.cpp:11][0m RedisCacheService: Initialized
+[2025-10-23 13:36:09.657] [32m[INFO ][0m [90m[main_new.cpp:2321][0m ✅ Redis Cache initialized
+[2025-10-23 13:36:09.657] [32m[INFO ][0m [90m[main_new.cpp:2324][0m 🔌 Initializing WebSocket...
+[2025-10-23 13:36:09.658] [32m[INFO ][0m [90m[WebSocketManager.cpp:9][0m WebSocketManager: Initialized
+[2025-10-23 13:36:09.658] [32m[INFO ][0m [90m[WebSocketHandler.cpp:14][0m WebSocketHandler: Initialized
+[2025-10-23 13:36:09.660] [32m[INFO ][0m [90m[main_new.cpp:2364][0m ✅ WebSocket initialized - Connections: 0
+[2025-10-23 13:36:09.661] [32m[INFO ][0m [90m[main_new.cpp:2367][0m 📬 Initializing Message Queue...
+[2025-10-23 13:36:09.663] [32m[INFO ][0m [90m[RedisMessageQueue.cpp:14][0m [RedisMessageQueue] Initialized with retry config: 3 retries
+[2025-10-23 13:36:09.664] [32m[INFO ][0m [90m[main_new.cpp:2381][0m ✅ Message Queue initialized (max retries: 3)
+[2025-10-23 13:36:09.666] [36m[DEBUG][0m [90m[RedisClient.cpp:484][0m Redis XGROUP CREATE: group already exists
+[2025-10-23 13:36:09.667] [32m[INFO ][0m [90m[RedisMessageQueue.cpp:57][0m [RedisMessageQueue] Consumer group created: emails -> email-workers
+[2025-10-23 13:36:09.669] [32m[INFO ][0m [90m[QueueWorker.cpp:30][0m [QueueWorker] Initialized for stream: emails, group: email-workers, consumer: worker-1
+[2025-10-23 13:36:09.672] [32m[INFO ][0m [90m[QueueWorker.cpp:51][0m [QueueWorker] Started worker thread for emails
+[2025-10-23 13:36:09.674] [32m[INFO ][0m [90m[main_new.cpp:2425][0m ✅ Email worker started in background
+[2025-10-23 13:36:09.674] [32m[INFO ][0m [90m[main_new.cpp:2428][0m 📡 Initializing Redis Pub/Sub for WebSocket broadcasting...
+[2025-10-23 13:36:09.676] [32m[INFO ][0m [90m[QueueWorker.cpp:73][0m [QueueWorker] Worker loop started
+[2025-10-23 13:36:09.679] [36m[DEBUG][0m [90m[RedisPubSub.cpp:99][0m [RedisPubSub] Channel registered: websocket:broadcast (will subscribe when started)
+[2025-10-23 13:36:09.694] [36m[DEBUG][0m [90m[RedisPubSub.cpp:42][0m [RedisPubSub] Subscribe context connected to 127.0.0.1:6379
+[2025-10-23 13:36:09.698] [32m[INFO ][0m [90m[RedisPubSub.cpp:171][0m [RedisPubSub] Subscribed to channel: websocket:broadcast
+[2025-10-23 13:36:09.700] [32m[INFO ][0m [90m[RedisPubSub.cpp:180][0m [RedisPubSub] Listener thread started
+[2025-10-23 13:36:09.701] [32m[INFO ][0m [90m[RedisPubSub.cpp:201][0m [RedisPubSub] Listen loop started
+[2025-10-23 13:36:09.704] [32m[INFO ][0m [90m[main_new.cpp:2450][0m ✅ Redis Pub/Sub initialized - Subscribed channels: 1
+[2025-10-23 13:36:09.706] [36m[DEBUG][0m [90m[main_new.cpp:2458][0m ✓ TenantRepository criado
+[2025-10-23 13:36:09] [INFO]  Server criado na porta 8080
+[2025-10-23 13:36:09] [INFO]  ThreadPool criado com 12 threads
+[2025-10-23 13:36:09.708] [32m[INFO ][0m [90m[main_new.cpp:2465][0m Configurando middlewares...
+[2025-10-23 13:36:09.708] [36m[DEBUG][0m [90m[main_new.cpp:2471][0m ✓ CORS middleware
+[2025-10-23 13:36:09.708] [36m[DEBUG][0m [90m[main_new.cpp:2475][0m ✓ Tenant middleware
+[2025-10-23 13:36:09.710] [36m[DEBUG][0m [90m[main_new.cpp:2479][0m ✓ Metrics middleware
+[2025-10-23 13:36:09.711] [36m[DEBUG][0m [90m[main_new.cpp:2483][0m ✓ Request logger middleware
+[2025-10-23 13:36:09.712] [36m[DEBUG][0m [90m[main_new.cpp:2487][0m ✓ Timing middleware
+[2025-10-23 13:36:09.713] [36m[DEBUG][0m [90m[main_new.cpp:2491][0m ✓ Error handler middleware
+[2025-10-23 13:36:09.714] [32m[INFO ][0m [90m[main_new.cpp:2493][0m ✅ 6 middlewares configurados!
+[2025-10-23 13:36:09] [INFO]  [PaymentRepository] Initialized
+[2025-10-23 13:36:09] [INFO]  [PaymentController] Initialized
+[2025-10-23 13:36:09] [INFO]  [PlanRepository] Initialized
+[2025-10-23 13:36:09] [INFO]  [SubscriptionRepository] Initialized
+[2025-10-23 13:36:09] [INFO]  [BillingHistoryRepository] Initialized
+[2025-10-23 13:36:09] [INFO]  [SubscriptionController] Initialized
+[2025-10-23 13:36:09] [INFO]  [InvoiceRepository] Initialized
+[2025-10-23 13:36:09] [INFO]  [InvoiceController] Initialized
+[2025-10-23 13:36:09] [INFO]  [TaskRepositoryImpl] Initialized COMPLETE VERSION
+[2025-10-23 13:36:09] [INFO]  [TaskController] Initialized
+[2025-10-23 13:36:09] [INFO]  [EventRepositoryImpl] Initialized
+[2025-10-23 13:36:09] [INFO]  [EventController] Initialized
+[2025-10-23 13:36:09] [INFO]  [MAIN] Creating Finance repositories...
+[2025-10-23 13:36:09] [INFO]  [MAIN] Creating Finance controller...
+[2025-10-23 13:36:09] [INFO]  [FinanceController] Initialized with all use cases
+[2025-10-23 13:36:09.733] [36m[DEBUG][0m [90m[RateLimitStorage.cpp:7][0m RateLimitStorage initialized
+[2025-10-23 13:36:09] [INFO]  [MAIN] Registering Finance routes...
+[2025-10-23 13:36:09] [INFO]  [MAIN] Finance module registered: 29 routes
+[2025-10-23 13:36:09.753] [32m[INFO ][0m [90m[main_new.cpp:2529][0m 🚀 Servidor iniciando na porta 8080...
+[2025-10-23 13:36:09] [INFO]  🚀 Iniciando servidor...
+[2025-10-23 13:36:09] [INFO]  ✅ Servidor rodando em http://localhost:8080
+[2025-10-23 13:36:09] [INFO]  📡 Aguardando conexões... (Ctrl+C para parar)
+[2025-10-23 13:36:23.456] [36m[DEBUG][0m [90m[Server.cpp:161][0m [Server::handleConnection] ==================== INÍCIO ====================
+[2025-10-23 13:36:23.460] [36m[DEBUG][0m [90m[Server.cpp:162][0m [Server::handleConnection] Socket: 828
+[2025-10-23 13:36:23.462] [36m[DEBUG][0m [90m[Server.cpp:165][0m [Server::handleConnection] Calling parseRequest()...
+[2025-10-23 13:36:23.463] [36m[DEBUG][0m [90m[Server.cpp:268][0m First recv() - bytes received: 380
+[2025-10-23 13:36:23.464] [36m[DEBUG][0m [90m[Server.cpp:329][0m === RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23.465] [36m[DEBUG][0m [90m[Server.cpp:330][0m Total rawRequest size: 380
+[2025-10-23 13:36:23.466] [36m[DEBUG][0m [90m[Server.cpp:331][0m Content-Length header: 152
+[2025-10-23 13:36:23.468] [36m[DEBUG][0m [90m[Server.cpp:336][0m Raw request preview (first 380 chars): POST /api/auth/register HTTP/1.1
+User-Agent: Mozilla/5.0 (Windows NT; Windows NT 10.0; pt-BR) WindowsPowerShell/5.1.26100.6899
+Content-Type: application/json
+Host: localhost:8080
+Content-Length: 152
+Expect: 100-continue
+
+{
+    "email":  "finance1761237381419@test.com",
+    "name":  "Finance Test User",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.469] [36m[DEBUG][0m [90m[Server.cpp:342][0m Parsed Content-Length: 152
+[2025-10-23 13:36:23.471] [36m[DEBUG][0m [90m[Server.cpp:353][0m Body start position: 224
+[2025-10-23 13:36:23.472] [36m[DEBUG][0m [90m[Server.cpp:357][0m Body start (after \r\n\r\n): 228
+[2025-10-23 13:36:23.472] [36m[DEBUG][0m [90m[Server.cpp:361][0m Body extracted (length=152): {
+    "email":  "finance1761237381419@test.com",
+    "name":  "Finance Test User",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.473] [36m[DEBUG][0m [90m[Server.cpp:370][0m Body set successfully!
+[2025-10-23 13:36:23.474] [36m[DEBUG][0m [90m[Server.cpp:425][0m === END RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23] [INFO]  📥 POST /api/auth/register
+[2025-10-23 13:36:23.477] [36m[DEBUG][0m [90m[Server.cpp:176][0m [Server::handleConnection] Request parsed successfully!
+[2025-10-23 13:36:23.478] [36m[DEBUG][0m [90m[Server.cpp:220][0m [Server] About to call router->handle()
+[2025-10-23 13:36:23.479] [36m[DEBUG][0m [90m[Server.cpp:221][0m [Server] router_ is NOT NULL
+[2025-10-23 13:36:23.480] [36m[DEBUG][0m [90m[Server.cpp:224][0m [Server] Calling router_->handle()...
+[2025-10-23 13:36:23] [INFO]  🔵 [Router::handle] ========== CHAMADO! ==========
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] handle() called for: POST /api/auth/register
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] middlewareChain_ is NOT NULL
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Checking if middlewareChain_...
+[2025-10-23 13:36:23] [INFO]  🔵🔵🔵 [Router] ENTRANDO NO IF! Using MiddlewareChain v2.0
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] MiddlewareChain size: 6
+[2025-10-23 13:36:23.487] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:68][0m TenantMiddleware: Host header = localhost:8080
+[2025-10-23 13:36:23.488] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:16][0m extractSubdomain: Host without port = localhost
+[2025-10-23 13:36:23.488] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:74][0m TenantMiddleware: No subdomain found in Host header
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Inside MiddlewareChain finalHandler
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Salvando 7 headers dos middlewares
+[2025-10-23 13:36:23.490] [36m[DEBUG][0m [90m[RateLimitMiddleware.cpp:79][0m RateLimit: checking key=ip:unknown limit=100/3600s
+[2025-10-23 13:36:23.491] [36m[DEBUG][0m [90m[RateLimitMiddleware.cpp:116][0m RateLimit: request allowed (99 remaining)
+[2025-10-23 13:36:23.493] [36m[DEBUG][0m [90m[AuthController.cpp:16][0m Body received: {
+    "email":  "finance1761237381419@test.com",
+    "name":  "Finance Test User",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.494] [36m[DEBUG][0m [90m[AuthController.cpp:17][0m Content-Type: application/json
+[2025-10-23 13:36:23.536] [32m[INFO ][0m [90m[UserRepository.cpp:160][0m User created: finance1761237381419@test.com
+[2025-10-23 13:36:23.539] [32m[INFO ][0m [90m[RegisterUserUseCase.cpp:62][0m User registered successfully: finance1761237381419@test.com
+[2025-10-23 13:36:23.553] [36m[DEBUG][0m [90m[AuditLogRepository.cpp:71][0m Audit log created: USER_REGISTERED on user
+[2025-10-23 13:36:23] [INFO]  ← POST /api/auth/register - 201 (66ms)
+[2025-10-23 13:36:23.556] [36m[DEBUG][0m [90m[MetricsMiddleware.cpp:56][0m Metrics: POST /api/auth/register 201 (67.201600ms)
+[2025-10-23 13:36:23.558] [36m[DEBUG][0m [90m[Server.cpp:226][0m [Server] router_->handle() returned with status: 201
+[2025-10-23 13:36:23] [INFO]  📤 201 Created
+[2025-10-23 13:36:23.838] [36m[DEBUG][0m [90m[Server.cpp:161][0m [Server::handleConnection] ==================== INÍCIO ====================
+[2025-10-23 13:36:23.838] [36m[DEBUG][0m [90m[Server.cpp:162][0m [Server::handleConnection] Socket: 840
+[2025-10-23 13:36:23.839] [36m[DEBUG][0m [90m[Server.cpp:165][0m [Server::handleConnection] Calling parseRequest()...
+[2025-10-23 13:36:23.839] [36m[DEBUG][0m [90m[Server.cpp:268][0m First recv() - bytes received: 342
+[2025-10-23 13:36:23.839] [36m[DEBUG][0m [90m[Server.cpp:329][0m === RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23.840] [36m[DEBUG][0m [90m[Server.cpp:330][0m Total rawRequest size: 342
+[2025-10-23 13:36:23.840] [36m[DEBUG][0m [90m[Server.cpp:331][0m Content-Length header: 117
+[2025-10-23 13:36:23.840] [36m[DEBUG][0m [90m[Server.cpp:336][0m Raw request preview (first 342 chars): POST /api/auth/login HTTP/1.1
+User-Agent: Mozilla/5.0 (Windows NT; Windows NT 10.0; pt-BR) WindowsPowerShell/5.1.26100.6899
+Content-Type: application/json
+Host: localhost:8080
+Content-Length: 117
+Expect: 100-continue
+
+{
+    "email":  "finance1761237381419@test.com",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.841] [36m[DEBUG][0m [90m[Server.cpp:342][0m Parsed Content-Length: 117
+[2025-10-23 13:36:23.841] [36m[DEBUG][0m [90m[Server.cpp:353][0m Body start position: 221
+[2025-10-23 13:36:23.842] [36m[DEBUG][0m [90m[Server.cpp:357][0m Body start (after \r\n\r\n): 225
+[2025-10-23 13:36:23.843] [36m[DEBUG][0m [90m[Server.cpp:361][0m Body extracted (length=117): {
+    "email":  "finance1761237381419@test.com",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.843] [36m[DEBUG][0m [90m[Server.cpp:370][0m Body set successfully!
+[2025-10-23 13:36:23.844] [36m[DEBUG][0m [90m[Server.cpp:425][0m === END RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23] [INFO]  📥 POST /api/auth/login
+[2025-10-23 13:36:23.845] [36m[DEBUG][0m [90m[Server.cpp:176][0m [Server::handleConnection] Request parsed successfully!
+[2025-10-23 13:36:23.846] [36m[DEBUG][0m [90m[Server.cpp:220][0m [Server] About to call router->handle()
+[2025-10-23 13:36:23.846] [36m[DEBUG][0m [90m[Server.cpp:221][0m [Server] router_ is NOT NULL
+[2025-10-23 13:36:23.846] [36m[DEBUG][0m [90m[Server.cpp:224][0m [Server] Calling router_->handle()...
+[2025-10-23 13:36:23] [INFO]  🔵 [Router::handle] ========== CHAMADO! ==========
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] handle() called for: POST /api/auth/login
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] middlewareChain_ is NOT NULL
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Checking if middlewareChain_...
+[2025-10-23 13:36:23] [INFO]  🔵🔵🔵 [Router] ENTRANDO NO IF! Using MiddlewareChain v2.0
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] MiddlewareChain size: 6
+[2025-10-23 13:36:23.847] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:68][0m TenantMiddleware: Host header = localhost:8080
+[2025-10-23 13:36:23.847] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:16][0m extractSubdomain: Host without port = localhost
+[2025-10-23 13:36:23.847] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:74][0m TenantMiddleware: No subdomain found in Host header
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Inside MiddlewareChain finalHandler
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Salvando 7 headers dos middlewares
+[2025-10-23 13:36:23.848] [36m[DEBUG][0m [90m[RateLimitMiddleware.cpp:79][0m RateLimit: checking key=ip:unknown limit=5/60s
+[2025-10-23 13:36:23.848] [36m[DEBUG][0m [90m[RateLimitMiddleware.cpp:116][0m RateLimit: request allowed (3 remaining)
+[2025-10-23 13:36:23.849] [36m[DEBUG][0m [90m[AuthController.cpp:91][0m Login - Body received: {
+    "email":  "finance1761237381419@test.com",
+    "password":  "Finance123",
+    "tenant_subdomain":  "acme"
+}
+[2025-10-23 13:36:23.850] [36m[DEBUG][0m [90m[AuthController.cpp:92][0m Login - Content-Type: application/json
+[2025-10-23 13:36:23.851] [36m[DEBUG][0m [90m[AuthController.cpp:131][0m tenant_subdomain from body: acme
+[2025-10-23 13:36:23.852] [36m[DEBUG][0m [90m[AuthController.cpp:140][0m Login attempt: email=finance1761237381419@test.com, tenant_id=, tenant_subdomain=acme
+[2025-10-23 13:36:23.863] [36m[DEBUG][0m [90m[BcryptService.cpp:36][0m === BCRYPT VERIFY DEBUG ===
+[2025-10-23 13:36:23.863] [36m[DEBUG][0m [90m[BcryptService.cpp:37][0m Password to verify: Finance123
+[2025-10-23 13:36:23.863] [36m[DEBUG][0m [90m[BcryptService.cpp:38][0m Stored hash: $2b$12$P.iKOww5VeSIG3dmuOqdZu.TNgJT6qDH/vOfN.S1t2nmlX2Jdtx6n
+[2025-10-23 13:36:23.863] [36m[DEBUG][0m [90m[BcryptService.cpp:54][0m Extracted cost: 12
+[2025-10-23 13:36:23.864] [36m[DEBUG][0m [90m[BcryptService.cpp:63][0m Extracted salt: P.iKOww5VeSIG3dmuOqdZu
+[2025-10-23 13:36:23.864] [36m[DEBUG][0m [90m[BcryptService.cpp:67][0m Extracted stored hash: .TNgJT6qDH/vOfN.S1t2nmlX2Jdtx6n
+[2025-10-23 13:36:23.866] [36m[DEBUG][0m [90m[BcryptService.cpp:71][0m Computed new hash: .TNgJT6qDH/vOfN.S1t2nmlX2Jdtx6n
+[2025-10-23 13:36:23.867] [36m[DEBUG][0m [90m[BcryptService.cpp:75][0m Hash match: TRUE
+[2025-10-23 13:36:23.868] [36m[DEBUG][0m [90m[BcryptService.cpp:76][0m === END BCRYPT VERIFY DEBUG ===
+[2025-10-23 13:36:23.868] [36m[DEBUG][0m [90m[LoginUserUseCase.cpp:47][0m Resolving tenant_subdomain 'acme' to tenant_id
+[2025-10-23 13:36:23.874] [36m[DEBUG][0m [90m[LoginUserUseCase.cpp:56][0m Resolved tenant_subdomain 'acme' to tenant_id: 659eb680-1f6e-47b5-bafd-38100d6cee8e
+[2025-10-23 13:36:23.904] [32m[INFO ][0m [90m[UserRepository.cpp:189][0m User updated: 360dd510-a110-42c7-a629-b26f8d8fe9ca
+[2025-10-23 13:36:23.905] [32m[INFO ][0m [90m[LoginUserUseCase.cpp:92][0m User logged in with tenant context: finance1761237381419@test.com @ acme (tenant_id: 659eb680-1f6e-47b5-bafd-38100d6cee8e, role: admin)
+[2025-10-23 13:36:23.909] [36m[DEBUG][0m [90m[AuditLogRepository.cpp:71][0m Audit log created: USER_LOGIN on auth
+[2025-10-23 13:36:23] [INFO]  ← POST /api/auth/login - 200 (63ms)
+[2025-10-23 13:36:23.913] [36m[DEBUG][0m [90m[MetricsMiddleware.cpp:56][0m Metrics: POST /api/auth/login 200 (64.812200ms)
+[2025-10-23 13:36:23.913] [36m[DEBUG][0m [90m[Server.cpp:226][0m [Server] router_->handle() returned with status: 200
+[2025-10-23 13:36:23] [INFO]  📤 200 OK
+[2025-10-23 13:36:23.925] [36m[DEBUG][0m [90m[Server.cpp:161][0m [Server::handleConnection] ==================== INÍCIO ====================
+[2025-10-23 13:36:23.926] [36m[DEBUG][0m [90m[Server.cpp:162][0m [Server::handleConnection] Socket: 852
+[2025-10-23 13:36:23.926] [36m[DEBUG][0m [90m[Server.cpp:165][0m [Server::handleConnection] Calling parseRequest()...
+[2025-10-23 13:36:23.927] [36m[DEBUG][0m [90m[Server.cpp:268][0m First recv() - bytes received: 867
+[2025-10-23 13:36:23.927] [36m[DEBUG][0m [90m[Server.cpp:329][0m === RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23.928] [36m[DEBUG][0m [90m[Server.cpp:330][0m Total rawRequest size: 867
+[2025-10-23 13:36:23.928] [36m[DEBUG][0m [90m[Server.cpp:331][0m Content-Length header: 197
+[2025-10-23 13:36:23.929] [36m[DEBUG][0m [90m[Server.cpp:336][0m Raw request preview (first 500 chars): POST /api/finance/accounts HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer ewogICJhbGciOiAiSFMyNTYiLAogICJ0eXAiOiAiSldUIgp9.ewogICJlbWFpbCI6ICJmaW5hbmNlMTc2MTIzNzM4MTQxOUB0ZXN0LmNvbSIsCiAgImV4cCI6IDE3NjEyNDA5ODMsCiAgImlhdCI6IDE3NjEyMzczODMsCiAgInJvbGUiOiAiYWRtaW4iLAogICJzdWIiOiAiMzYwZGQ1MTAtYTExMC00MmM3LWE2MjktYjI2ZjhkOGZlOWNhIiwKICAidGVuYW50X2lkIjogIjY1OWViNjgwLTFmNmUtNDdiNS1iYWZkLTM4MTAwZDZjZWU4ZSIsCiAgInRlbmFudF9zdWJkb21haW4iOiAiYWNtZSIKfQ.SAZlw_Rr3344puBlb8OxAHkVlW7cMRuanfSGg
+[2025-10-23 13:36:23.929] [36m[DEBUG][0m [90m[Server.cpp:342][0m Parsed Content-Length: 197
+[2025-10-23 13:36:23.930] [36m[DEBUG][0m [90m[Server.cpp:353][0m Body start position: 666
+[2025-10-23 13:36:23.930] [36m[DEBUG][0m [90m[Server.cpp:357][0m Body start (after \r\n\r\n): 670
+[2025-10-23 13:36:23.930] [36m[DEBUG][0m [90m[Server.cpp:361][0m Body extracted (length=197): {
+    "name":  "Main Checking Account",
+    "bank_name":  "Banco do Brasil",
+    "currency":  "BRL",
+    "initial_balance":  5000,
+    "type":  "checking",
+    "account_number":  "12345-6"
+}
+[2025-10-23 13:36:23.930] [36m[DEBUG][0m [90m[Server.cpp:370][0m Body set successfully!
+[2025-10-23 13:36:23.931] [36m[DEBUG][0m [90m[Server.cpp:425][0m === END RAW REQUEST DEBUG ===
+[2025-10-23 13:36:23] [INFO]  📥 POST /api/finance/accounts
+[2025-10-23 13:36:23.931] [36m[DEBUG][0m [90m[Server.cpp:176][0m [Server::handleConnection] Request parsed successfully!
+[2025-10-23 13:36:23.931] [36m[DEBUG][0m [90m[Server.cpp:220][0m [Server] About to call router->handle()
+[2025-10-23 13:36:23.931] [36m[DEBUG][0m [90m[Server.cpp:221][0m [Server] router_ is NOT NULL
+[2025-10-23 13:36:23.932] [36m[DEBUG][0m [90m[Server.cpp:224][0m [Server] Calling router_->handle()...
+[2025-10-23 13:36:23] [INFO]  🔵 [Router::handle] ========== CHAMADO! ==========
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] handle() called for: POST /api/finance/accounts
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] middlewareChain_ is NOT NULL
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Checking if middlewareChain_...
+[2025-10-23 13:36:23] [INFO]  🔵🔵🔵 [Router] ENTRANDO NO IF! Using MiddlewareChain v2.0
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] MiddlewareChain size: 6
+[2025-10-23 13:36:23.936] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:68][0m TenantMiddleware: Host header = localhost:8080
+[2025-10-23 13:36:23.937] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:16][0m extractSubdomain: Host without port = localhost
+[2025-10-23 13:36:23.937] [36m[DEBUG][0m [90m[TenantMiddleware.cpp:74][0m TenantMiddleware: No subdomain found in Host header
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Inside MiddlewareChain finalHandler
+[2025-10-23 13:36:23] [INFO]  🔵 [Router] Salvando 7 headers dos middlewares
+[2025-10-23 13:36:23.937] [36m[DEBUG][0m [90m[AuthMiddleware.cpp:56][0m AuthMiddleware: Authorization header found
+[2025-10-23 13:36:23.938] [36m[DEBUG][0m [90m[AuthMiddleware.cpp:72][0m AuthMiddleware: Token extracted successfully
+[2025-10-23 13:36:23.938] [32m[INFO ][0m [90m[AuthMiddleware.cpp:135][0m AuthMiddleware: User authenticated - user_id=360dd510-a110-42c7-a629-b26f8d8fe9ca, tenant_id=659eb680-1f6e-47b5-bafd-38100d6cee8e, role=admin

@@ -1,5 +1,8 @@
 #include "Middleware.hpp"
 #include "../utils/Logger.hpp"
+
+// Macro LOG_DEBUG
+#define LOG_DEBUG(msg) Utils::Logger::debug(msg)
 #include <chrono>
 #include <sstream>
 
@@ -88,10 +91,24 @@ MiddlewareFunction cors(
     const std::string& headers
 ) {
     return [origin, methods, headers](Request& req, Response& res, NextFunction next) {
-        // Adicionar headers CORS
-        res.setHeader("Access-Control-Allow-Origin", origin);
+        // Refletir o Origin da requisição (permite file://, localhost, null, etc)
+        std::string requestOrigin = req.getHeader("Origin");
+        
+        if (!requestOrigin.empty()) {
+            // Se tem Origin na requisição, refletir ele de volta
+            res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+        } else if (origin == "*") {
+            // Se não tem Origin mas está configurado como *, usar *
+            res.setHeader("Access-Control-Allow-Origin", "*");
+        } else {
+            // Usar o origin configurado
+            res.setHeader("Access-Control-Allow-Origin", origin);
+        }
+        
+        // Headers CORS adicionais
         res.setHeader("Access-Control-Allow-Methods", methods);
         res.setHeader("Access-Control-Allow-Headers", headers);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Access-Control-Max-Age", "86400");  // 24 horas
         
         // Se é preflight (OPTIONS), retornar 204 imediatamente
@@ -99,7 +116,6 @@ MiddlewareFunction cors(
             res.setStatus(StatusCode::NoContent);
             return;  // NÃO chama next() - para chain aqui
         }
-        
         next();
     };
 }

@@ -1,0 +1,92 @@
+# ========================================
+# PROMETHEUS CONFIGURATION
+# MoneyMaker C++ Backend Monitoring
+# ========================================
+
+global:
+  scrape_interval: 15s # Coletar métricas a cada 15 segundos
+  evaluation_interval: 15s # Avaliar regras a cada 15 segundos
+  external_labels:
+    cluster: "moneymaker-prod"
+    replica: "prometheus-1"
+
+# ========================================
+# ALERTMANAGER CONFIGURATION
+# ========================================
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# ========================================
+# RULES FILES
+# ========================================
+rule_files:
+  # - "alerts/backend.rules.yml"
+  # - "alerts/business.rules.yml"
+
+# ========================================
+# SCRAPE CONFIGURATIONS
+# ========================================
+scrape_configs:
+  # ===== C++ BACKEND - Métricas Principais =====
+  - job_name: "moneymaker-backend"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["backend:8080"] # Docker Compose
+        # - targets: ['localhost:8080']  # Desenvolvimento local
+        labels:
+          env: "production"
+          service: "backend-cpp"
+          version: "v2.0"
+    scrape_interval: 10s # Coletar mais frequentemente para backend
+
+  # ===== NODE EXPORTER - Métricas do Sistema =====
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          env: "production"
+          type: "system-metrics"
+
+  # ===== REDIS EXPORTER - Métricas do Redis =====
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          env: "production"
+          type: "cache"
+
+  # ===== POSTGRES EXPORTER - Métricas do PostgreSQL =====
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          env: "production"
+          type: "database"
+
+  # ===== PROMETHEUS SELF-MONITORING =====
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          env: "production"
+          type: "monitoring"
+# ========================================
+# REMOTE WRITE (Opcional - para long-term storage)
+# ========================================
+# remote_write:
+#   - url: "https://prometheus-storage.example.com/api/v1/write"
+#     basic_auth:
+#       username: "admin"
+#       password: "password"
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 50
+#       max_samples_per_send: 5000
+#       batch_send_deadline: 5s
+#       max_retries: 3
+#       min_backoff: 30ms
+#       max_backoff: 100ms
+
