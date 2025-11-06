@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../tenant_management/repositories/TenantRepository.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include <memory>
 #include <string>
 
@@ -15,7 +16,7 @@ struct RemoveUserFromTenantDto {
     std::string tenantId;
     std::string userId;              // User a ser removido
     std::string requestingUserId;    // User fazendo a remoção
-    std::string requestingUserRole;  // Role do user fazendo a remoção
+    ValueObjects::TenantUserRole requestingUserRole;  // Role do user fazendo a remoção
 };
 
 /**
@@ -38,8 +39,6 @@ public:
 
 private:
     std::shared_ptr<TenantRepository> repository_;
-    
-    bool canManageMembers(const std::string& role) const;
 };
 
 } // namespace Domains::TenantManagement::UseCases

@@ -12,18 +12,27 @@ namespace Domains::IAM::UseCases {
 RegisterUserUseCase::RegisterUserUseCase(
     std::shared_ptr<Domains::UserManagement::Repositories::UserRepository> repository,
     std::shared_ptr<Domains::IAM::Services::BcryptService> bcryptService,
+    std::shared_ptr<Domains::IAM::Services::JwtService> jwtService,
     std::shared_ptr<Domains::Audit::Repositories::AuditLogRepository> auditLogRepository,
     std::shared_ptr<Domains::TenantManagement::Repositories::TenantRepository> tenantRepository
 ) : repository_(repository), 
-    bcryptService_(bcryptService), 
+    bcryptService_(bcryptService),
+    jwtService_(jwtService),
     auditLogRepository_(auditLogRepository),
     tenantRepository_(tenantRepository) {}
 
-User RegisterUserUseCase::execute(const RegisterUserDto& dto) {
+RegisterResult RegisterUserUseCase::execute(const RegisterUserDto& dto) {
+    LOG_DEBUG("🔵 [REGISTER] Starting user registration");
+    LOG_DEBUG("   Email: " + dto.email);
+    LOG_DEBUG("   Name: " + dto.name);
+    LOG_DEBUG("   Tenant Subdomain provided: " + std::string(dto.tenant_subdomain.empty() ? "NO (will create new)" : "YES (" + dto.tenant_subdomain + ")"));
+    
     // 1. Validar email
+    LOG_DEBUG("🔵 [REGISTER] Validating email...");
     Email email(dto.email);
     
     // 2. Validar nome
+    LOG_DEBUG("🔵 [REGISTER] Validating name...");
     if (dto.name.empty()) {
         throw std::invalid_argument("Name cannot be empty");
     }
@@ -53,14 +62,19 @@ User RegisterUserUseCase::execute(const RegisterUserDto& dto) {
     }
     
     // 3. Verificar se email já existe
+    LOG_DEBUG("🔵 [REGISTER] Checking if email already exists...");
     if (repository_->existsByEmail(email.value())) {
+        LOG_ERROR("❌ [REGISTER] Email already registered: " + email.value());
         throw std::runtime_error("Email already registered: " + email.value());
     }
+    LOG_DEBUG("✅ [REGISTER] Email is unique");
     
     // 4. Validar senha (mas NÃO hashear ainda - operação custosa)
+    LOG_DEBUG("🔵 [REGISTER] Validating password...");
     Password password(dto.password);
     
     // ========== VALIDAR TENANT ANTES DE CRIAR USER ==========
+    LOG_DEBUG("🔵 [REGISTER] Validating tenant...");
     // ⚠️ CRÍTICO: Validar tenant ANTES de criar user no banco
     //    Se tenant não existir, falha aqui sem criar user órfão
     
@@ -105,23 +119,30 @@ User RegisterUserUseCase::execute(const RegisterUserDto& dto) {
     }
     
     // ========== TUDO VALIDADO → AGORA SIM CRIAR USER ==========
+    LOG_DEBUG("✅ [REGISTER] All validations passed, proceeding to create user");
     
     // 5. Hashear senha (operação custosa, só fazer agora que tudo foi validado)
+    LOG_DEBUG("🔵 [REGISTER] Hashing password...");
     std::string hashedPassword = bcryptService_->hash(dto.password);
     Password hashedPasswordObj(hashedPassword, true); // true = já está hasheado
     
     // 6. Criar usuário com senha hasheada
+    LOG_DEBUG("🔵 [REGISTER] Creating User entity...");
     User user = User::create(email, hashedPasswordObj, dto.name);
     
     // 7. Salvar no banco
+    LOG_DEBUG("🔵 [REGISTER] Saving user to database...");
     User savedUser = repository_->save(user);
     
     LOG_INFO("✅ User created in database: " + savedUser.getEmail().value());
+    LOG_DEBUG("   User ID: " + savedUser.getId());
     
     // ========== CRIAR/ASSOCIAR TENANT ==========
+    LOG_DEBUG("🔵 [REGISTER] Creating/associating tenant...");
     
     if (shouldCreateNewTenant) {
         // Criar novo tenant
+        LOG_DEBUG("   Creating new tenant with ID: " + tenantId);
         bool tenantCreated = tenantRepository_->createTenant(tenantId, newTenantName, tenantSubdomain);
         if (!tenantCreated) {
             LOG_ERROR("❌ Failed to create tenant for user: " + savedUser.getId());
@@ -129,18 +150,44 @@ User RegisterUserUseCase::execute(const RegisterUserDto& dto) {
         }
         
         LOG_INFO("✅ Created new tenant: " + tenantId + " (" + tenantSubdomain + ")");
+    } else {
+        LOG_DEBUG("   Using existing tenant: " + tenantId + " (" + tenantSubdomain + ")");
     }
     
     // 8. Adicionar relacionamento user_tenants
+    LOG_DEBUG("🔵 [REGISTER] Adding user to tenant with role: " + userRole);
     try {
         tenantRepository_->addUserToTenant(savedUser.getId(), tenantId, userRole);
-        LOG_INFO("User-Tenant relationship created: user_id=" + savedUser.getId() + ", tenant_id=" + tenantId + ", role=" + userRole);
+        LOG_INFO("✅ User-Tenant relationship created: user_id=" + savedUser.getId() + ", tenant_id=" + tenantId + ", role=" + userRole);
     } catch (const std::exception& e) {
-        LOG_ERROR("Failed to add user to tenant: " + std::string(e.what()));
+        LOG_ERROR("❌ Failed to add user to tenant: " + std::string(e.what()));
         // Continuar mesmo se falhar (usuário já foi criado)
     }
     
-    // 9. Registrar no Audit Log
+    // 9. Gerar tokens JWT (similar ao login)
+    LOG_DEBUG("🔑 [REGISTER] Generating JWT tokens for user: " + savedUser.getId());
+    LOG_DEBUG("   Parameters: user_id=" + savedUser.getId() + 
+              ", email=" + savedUser.getEmail().value() +
+              ", tenant_id=" + tenantId +
+              ", tenant_subdomain=" + tenantSubdomain +
+              ", role=" + userRole);
+    
+    std::string token = jwtService_->generateTokenForTenant(
+        savedUser.getId(),
+        savedUser.getEmail().value(),
+        tenantId,
+        tenantSubdomain,
+        userRole
+    );
+    LOG_DEBUG("   Access token generated: " + std::string(token.empty() ? "FAILED ❌" : "OK ✅ (length: " + std::to_string(token.length()) + ")"));
+    
+    std::string refreshToken = jwtService_->generateRefreshToken(savedUser.getId());
+    LOG_DEBUG("   Refresh token generated: " + std::string(refreshToken.empty() ? "FAILED ❌" : "OK ✅ (length: " + std::to_string(refreshToken.length()) + ")"));
+    
+    LOG_INFO("✅ User registered and authenticated: " + savedUser.getEmail().value() + 
+             " @ " + tenantSubdomain + " (tenant_id: " + tenantId + ", role: " + userRole + ")");
+    
+    // 10. Registrar no Audit Log
     try {
         std::string details = "{\"email\": \"" + savedUser.getEmail().value() + 
                               "\", \"tenant_id\": \"" + tenantId + 
@@ -156,12 +203,29 @@ User RegisterUserUseCase::execute(const RegisterUserDto& dto) {
             "127.0.0.1",                           // ip_address (TODO: get real IP)
             "UserAgent/1.0"                        // user_agent (TODO: get real User-Agent)
         );
+        LOG_DEBUG("✅ [REGISTER] Audit log created successfully");
     } catch (const std::exception& e) {
-        LOG_ERROR("Failed to create audit log: " + std::string(e.what()));
+        LOG_ERROR("❌ [REGISTER] Failed to create audit log: " + std::string(e.what()));
         // Não falhar o registro por causa de erro no audit log
     }
     
-    return savedUser;
+    // 11. Retornar resultado com tokens
+    LOG_DEBUG("🔵 [REGISTER] Preparing RegisterResult to return");
+    LOG_DEBUG("   user.id: " + savedUser.getId());
+    LOG_DEBUG("   token length: " + std::to_string(token.length()));
+    LOG_DEBUG("   refreshToken length: " + std::to_string(refreshToken.length()));
+    LOG_DEBUG("   tenant_id: " + tenantId);
+    LOG_DEBUG("   tenant_subdomain: " + tenantSubdomain);
+    LOG_DEBUG("   role: " + userRole);
+    
+    return RegisterResult{
+        savedUser,
+        token,
+        refreshToken,
+        tenantId,
+        tenantSubdomain,
+        userRole
+    };
 }
 
 // Helper: Gerar slug a partir de string

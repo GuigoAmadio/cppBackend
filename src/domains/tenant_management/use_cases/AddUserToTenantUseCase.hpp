@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../tenant_management/repositories/TenantRepository.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include "../../user_management/repositories/UserRepository.hpp"
 #include <memory>
 #include <string>
@@ -15,9 +16,9 @@ using namespace Repositories;
 struct AddUserToTenantDto {
     std::string tenantId;
     std::string userId;              // User a ser adicionado (deve existir)
-    std::string role;                // Role inicial (default: "user")
+    ValueObjects::TenantUserRole role;  // Role inicial (default: "user")
     std::string requestingUserId;    // User fazendo a adição
-    std::string requestingUserRole;  // Role do user fazendo a adição
+    ValueObjects::TenantUserRole requestingUserRole;  // Role do user fazendo a adição
 };
 
 /**
@@ -45,9 +46,6 @@ public:
 private:
     std::shared_ptr<TenantRepository> tenantRepository_;
     std::shared_ptr<Domains::UserManagement::Repositories::UserRepository> userRepository_;
-    
-    bool canManageMembers(const std::string& role) const;
-    int getRolePriority(const std::string& role) const;
 };
 
 } // namespace Domains::TenantManagement::UseCases

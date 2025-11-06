@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../tenant_management/repositories/TenantRepository.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@ struct TenantMember {
     std::string userId;
     std::string email;
     std::string name;
-    std::string role;
+    ValueObjects::TenantUserRole role;
     bool isActive;
 };
 
@@ -26,7 +27,7 @@ struct TenantMember {
 struct ListTenantMembersDto {
     std::string tenantId;
     std::string requestingUserId;
-    std::string requestingUserRole;
+    ValueObjects::TenantUserRole requestingUserRole;
 };
 
 /**

@@ -1,4 +1,5 @@
 #include "TenantRepository.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include "../../../core/utils/LoggerNew.hpp"
 #include <sstream>
 #include <iomanip>
@@ -131,10 +132,10 @@ bool TenantRepository::userHasAccessToTenant(const std::string& userId, const st
     
     std::string sql = R"(
         SELECT 1 FROM user_tenants
-        WHERE user_id = $1 AND tenant_id = $2
+        WHERE user_id = $1 AND tenant_id = $2 AND is_active = true
     )";
     
-    LOG_DEBUG("   SQL: SELECT 1 FROM user_tenants WHERE user_id = '" + userId + "' AND tenant_id = '" + tenantId + "'");
+    LOG_DEBUG("   SQL: SELECT 1 FROM user_tenants WHERE user_id = '" + userId + "' AND tenant_id = '" + tenantId + "' AND is_active = true");
     
     auto result = conn->executeParams(sql, {userId, tenantId});
     
@@ -146,7 +147,7 @@ bool TenantRepository::userHasAccessToTenant(const std::string& userId, const st
     return hasAccess;
 }
 
-std::optional<std::string> TenantRepository::getUserRoleInTenant(const std::string& userId, const std::string& tenantId) {
+std::optional<ValueObjects::TenantUserRole> TenantRepository::getUserRoleInTenant(const std::string& userId, const std::string& tenantId) {
     LOG_DEBUG("🔍 [TENANT] getUserRoleInTenant() called");
     LOG_DEBUG("   user_id: " + userId);
     LOG_DEBUG("   tenant_id: " + tenantId);
@@ -155,10 +156,10 @@ std::optional<std::string> TenantRepository::getUserRoleInTenant(const std::stri
     
     std::string sql = R"(
         SELECT role FROM user_tenants
-        WHERE user_id = $1 AND tenant_id = $2
+        WHERE user_id = $1 AND tenant_id = $2 AND is_active = true
     )";
     
-    LOG_DEBUG("   SQL: SELECT role FROM user_tenants WHERE user_id = '" + userId + "' AND tenant_id = '" + tenantId + "'");
+    LOG_DEBUG("   SQL: SELECT role FROM user_tenants WHERE user_id = '" + userId + "' AND tenant_id = '" + tenantId + "' AND is_active = true");
     
     auto result = conn->executeParams(sql, {userId, tenantId});
     
@@ -166,9 +167,14 @@ std::optional<std::string> TenantRepository::getUserRoleInTenant(const std::stri
     LOG_DEBUG("   Row count: " + std::to_string(result.rowCount()));
     
     if (result.isSuccess() && result.rowCount() > 0) {
-        std::string role = result.getValue(0, 0);
-        LOG_DEBUG("   Role found: " + role);
-        return role;
+        std::string roleStr = result.getValue(0, 0);
+        LOG_DEBUG("   Role found: " + roleStr);
+        try {
+            return ValueObjects::TenantUserRole(roleStr);
+        } catch (const std::invalid_argument& e) {
+            LOG_ERROR("Invalid role in database: " + roleStr + " - " + e.what());
+            return std::nullopt;
+        }
     }
     
     LOG_DEBUG("   No role found (returning nullopt)");
@@ -178,10 +184,12 @@ std::optional<std::string> TenantRepository::getUserRoleInTenant(const std::stri
 void TenantRepository::addUserToTenant(
     const std::string& userId, 
     const std::string& tenantId, 
-    const std::string& role,
+    const ValueObjects::TenantUserRole& role,
     const std::optional<std::string>& addedBy
 ) {
     auto conn = pool_->acquire();
+    
+    std::string roleStr = role.toString();
     
     std::string sql = R"(
         INSERT INTO user_tenants (user_id, tenant_id, role, is_active, created_at, updated_at)
@@ -190,13 +198,13 @@ void TenantRepository::addUserToTenant(
         DO UPDATE SET role = EXCLUDED.role, is_active = true, updated_at = NOW()
     )";
     
-    auto result = conn->executeParams(sql, {userId, tenantId, role});
+    auto result = conn->executeParams(sql, {userId, tenantId, roleStr});
     
     if (!result.isSuccess()) {
         throw std::runtime_error("Failed to add user to tenant");
     }
     
-    LOG_INFO("User " + userId + " added to tenant " + tenantId + " with role " + role);
+    LOG_INFO("User " + userId + " added to tenant " + tenantId + " with role " + roleStr);
 }
 
 void TenantRepository::removeUserFromTenant(const std::string& userId, const std::string& tenantId) {
@@ -216,8 +224,10 @@ void TenantRepository::removeUserFromTenant(const std::string& userId, const std
     LOG_INFO("User " + userId + " removed from tenant " + tenantId);
 }
 
-void TenantRepository::updateUserRole(const std::string& userId, const std::string& tenantId, const std::string& newRole) {
+void TenantRepository::updateUserRole(const std::string& userId, const std::string& tenantId, const ValueObjects::TenantUserRole& newRole) {
     auto conn = pool_->acquire();
+    
+    std::string roleStr = newRole.toString();
     
     std::string sql = R"(
         UPDATE user_tenants
@@ -225,13 +235,13 @@ void TenantRepository::updateUserRole(const std::string& userId, const std::stri
         WHERE user_id = $2 AND tenant_id = $3
     )";
     
-    auto result = conn->executeParams(sql, {newRole, userId, tenantId});
+    auto result = conn->executeParams(sql, {roleStr, userId, tenantId});
     
     if (!result.isSuccess()) {
         throw std::runtime_error("Failed to update user role");
     }
     
-    LOG_INFO("User " + userId + " role updated to " + newRole + " in tenant " + tenantId);
+    LOG_INFO("User " + userId + " role updated to " + roleStr + " in tenant " + tenantId);
 }
 
 std::vector<std::map<std::string, std::string>> TenantRepository::getUserTenants(const std::string& userId) {
@@ -304,7 +314,7 @@ int TenantRepository::countActiveUsers(const std::string& tenantId) {
     
     std::string sql = R"(
         SELECT COUNT(*) FROM user_tenants
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1 AND is_active = true
     )";
     
     auto result = conn->executeParams(sql, {tenantId});

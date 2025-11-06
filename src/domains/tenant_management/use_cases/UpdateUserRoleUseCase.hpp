@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../tenant_management/repositories/TenantRepository.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include <memory>
 #include <string>
 
@@ -14,9 +15,9 @@ using namespace Repositories;
 struct UpdateUserRoleDto {
     std::string tenantId;
     std::string userId;              // User cuja role será alterada
-    std::string newRole;             // Nova role
+    ValueObjects::TenantUserRole newRole;  // Nova role
     std::string requestingUserId;    // User fazendo a alteração
-    std::string requestingUserRole;  // Role do user fazendo a alteração
+    ValueObjects::TenantUserRole requestingUserRole;  // Role do user fazendo a alteração
 };
 
 /**
@@ -39,9 +40,6 @@ public:
 
 private:
     std::shared_ptr<TenantRepository> repository_;
-    
-    bool canManageRoles(const std::string& role) const;
-    int getRolePriority(const std::string& role) const;
 };
 
 } // namespace Domains::TenantManagement::UseCases

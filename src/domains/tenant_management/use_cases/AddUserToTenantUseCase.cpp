@@ -8,18 +8,6 @@ AddUserToTenantUseCase::AddUserToTenantUseCase(
     std::shared_ptr<Domains::UserManagement::Repositories::UserRepository> userRepository
 ) : tenantRepository_(tenantRepository), userRepository_(userRepository) {}
 
-bool AddUserToTenantUseCase::canManageMembers(const std::string& role) const {
-    return role == "owner" || role == "admin";
-}
-
-int AddUserToTenantUseCase::getRolePriority(const std::string& role) const {
-    if (role == "owner") return 4;
-    if (role == "admin") return 3;
-    if (role == "user") return 2;
-    if (role == "viewer") return 1;
-    return 0;
-}
-
 void AddUserToTenantUseCase::execute(const AddUserToTenantDto& dto) {
     // 1. Verificar se tenant existe
     auto tenantOpt = tenantRepository_->findById(dto.tenantId);
@@ -28,10 +16,10 @@ void AddUserToTenantUseCase::execute(const AddUserToTenantDto& dto) {
         throw std::runtime_error("Tenant not found");
     }
     
-    // 2. Verificar autorização (apenas owner/admin)
-    if (!canManageMembers(dto.requestingUserRole)) {
+    // 2. Verificar autorização (apenas quem pode gerenciar membros)
+    if (!dto.requestingUserRole.canManageMembers()) {
         LOG_WARNING("AddUserToTenant failed: insufficient permissions - " + 
-                   dto.requestingUserId + " (role: " + dto.requestingUserRole + ")");
+                   dto.requestingUserId + " (role: " + dto.requestingUserRole.toString() + ")");
         throw std::runtime_error("Only owners and admins can add members");
     }
     
@@ -50,12 +38,9 @@ void AddUserToTenantUseCase::execute(const AddUserToTenantDto& dto) {
     }
     
     // 5. Verificar se não está tentando adicionar com role superior à própria
-    int requestingPriority = getRolePriority(dto.requestingUserRole);
-    int newRolePriority = getRolePriority(dto.role);
-    
-    if (newRolePriority > requestingPriority) {
+    if (!dto.requestingUserRole.canModifyRole(dto.role)) {
         LOG_WARNING("AddUserToTenant failed: attempting to assign higher role - " + 
-                   dto.requestingUserId + " trying to assign " + dto.role);
+                   dto.requestingUserId + " trying to assign " + dto.role.toString());
         throw std::runtime_error("You cannot assign a role higher than your own");
     }
     
@@ -63,7 +48,7 @@ void AddUserToTenantUseCase::execute(const AddUserToTenantDto& dto) {
     tenantRepository_->addUserToTenant(dto.userId, dto.tenantId, dto.role, dto.requestingUserId);
     
     LOG_INFO("User added to tenant: " + dto.userId + " added to tenant " + 
-             dto.tenantId + " with role " + dto.role + " by " + dto.requestingUserId);
+             dto.tenantId + " with role " + dto.role.toString() + " by " + dto.requestingUserId);
 }
 
 } // namespace Domains::TenantManagement::UseCases

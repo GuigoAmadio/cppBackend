@@ -31,7 +31,13 @@ std::vector<TenantMember> ListTenantMembersUseCase::execute(const ListTenantMemb
         member.userId = m.at("id");  // Note: getTenantUsers returns "id", not "user_id"
         member.email = m.at("email");
         member.name = m.at("name");
-        member.role = m.at("role");
+        try {
+            member.role = ValueObjects::TenantUserRole(m.at("role"));
+        } catch (const std::invalid_argument& e) {
+            LOG_WARNING("Invalid role in database: " + m.at("role") + " - " + e.what());
+            // Pular membro com role inválida ou usar default
+            continue;
+        }
         member.isActive = (m.at("is_active") == "t" || m.at("is_active") == "true");
         members.push_back(member);
     }

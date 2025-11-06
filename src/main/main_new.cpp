@@ -46,6 +46,7 @@
 #include "../domains/user_management/use_cases/DeleteUserUseCase.hpp"
 #include "../domains/user_management/use_cases/ListUsersUseCase.hpp"
 #include "../domains/tenant_management/use_cases/ListTenantMembersUseCase.hpp"
+#include "../domains/tenant_management/value_objects/TenantUserRole.hpp"
 #include "../domains/tenant_management/use_cases/UpdateUserRoleUseCase.hpp"
 #include "../domains/tenant_management/use_cases/RemoveUserFromTenantUseCase.hpp"
 #include "../domains/tenant_management/use_cases/AddUserToTenantUseCase.hpp"
@@ -59,6 +60,7 @@
 #include "../domains/audit/repositories/AuditLogRepository.hpp"
 #include "../domains/notification/services/EmailService.hpp"
 #include "../domains/iam/controllers/AuthController.hpp"
+#include "../domains/user_management/controllers/UsersController.hpp"
 #include "../domains/workspace/repositories/WorkspaceRepository.hpp"
 #include "../domains/workspace/controllers/WorkspaceController.hpp"
 #include "../domains/product/repositories/ProductRepository.hpp"
@@ -472,6 +474,7 @@ auto auditLogRepository = std::make_shared<Domains::Audit::Repositories::AuditLo
 auto registerUseCase = std::make_shared<Domains::IAM::UseCases::RegisterUserUseCase>(
     userRepository,
     bcryptService,
+    jwtService,
     auditLogRepository,
     tenantRepository  // ✅ Adicionado para suporte a multitenancy
 );
@@ -531,11 +534,19 @@ auto resetPasswordUseCase = std::make_shared<Domains::Notification::UseCases::Re
     bcryptService
 );
 
-// 3. Criar Controller
-auto authController = std::make_shared<Domains::IAM::Controllers::AuthController>(
-    registerUseCase,
-    loginUseCase
-);
+  // 3. Criar Controllers
+  auto authController = std::make_shared<Domains::IAM::Controllers::AuthController>(
+      registerUseCase,
+      loginUseCase
+  );
+
+  auto usersController = std::make_shared<Domains::UserManagement::Controllers::UsersController>(
+      getUserUseCase,
+      updateUserUseCase,
+      changePasswordUseCase,
+      deleteUserUseCase,
+      listUsersUseCase
+  );
 
 // 4. Configurar Rate Limiting
 // Login: 1000 tentativas por hora (MODO DESENVOLVIMENTO - em prod use 5/60)
@@ -836,303 +847,56 @@ auto withAuthAndRole = [&withAuth, &withRole](const std::vector<std::string>& al
 };
 
 // GET /api/me - Retorna dados do usuário logado
-router.get("/api/me", withAuth([getUserUseCase](const Request& req) {
-    std::string userId = req.getCustomData("user_id");
-    std::string userEmail = req.getCustomData("user_email");
-    std::string tenantId = req.getCustomData("user_tenant_id");
-    std::string role = req.getCustomData("user_role");
-    
-    auto userOpt = getUserUseCase->execute(userId);
-    
-    if (!userOpt.has_value()) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("User not found");
-        return Response(StatusCode::NotFound).json(*error);
-    }
-    
-    auto user = userOpt.value();
-    auto json = Core::Json::makeObject();
-    json->asObject()["id"] = Core::Json::makeString(user.getId());
-    json->asObject()["email"] = Core::Json::makeString(user.getEmail().value());
-    json->asObject()["name"] = Core::Json::makeString(user.getName());
-    json->asObject()["is_active"] = Core::Json::makeBool(user.isActive());
-    json->asObject()["email_verified"] = Core::Json::makeBool(user.isEmailVerified());
-    
-    // Adicionar informações do token
-    if (!tenantId.empty()) {
-        json->asObject()["current_tenant_id"] = Core::Json::makeString(tenantId);
-    }
-    if (!role.empty()) {
-        json->asObject()["current_role"] = Core::Json::makeString(role);
-    }
-    
-    return Response(StatusCode::OK).json(*json);
+router.get("/api/me", withAuth([usersController](const Request& req) {
+    return usersController->me(req);
 }));
 
 // GET /api/users/:id - Busca usuário (protegida)
-router.get("/api/users/:id", withAuth([getUserUseCase](const Request& req) {
-    std::string requestedUserId = req.getParam("id");
-    std::string loggedUserId = req.getCustomData("user_id");
-    
-    // Verificar se está tentando acessar outro usuário
-    if (requestedUserId != loggedUserId) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("You can only view your own profile");
-        return Response(StatusCode::Forbidden).json(*error);
-    }
-    
-    auto userOpt = getUserUseCase->execute(requestedUserId);
-    
-    if (!userOpt.has_value()) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("User not found");
-        return Response(StatusCode::NotFound).json(*error);
-    }
-    
-    auto user = userOpt.value();
-    auto json = Core::Json::makeObject();
-    json->asObject()["id"] = Core::Json::makeString(user.getId());
-    json->asObject()["email"] = Core::Json::makeString(user.getEmail().value());
-    json->asObject()["name"] = Core::Json::makeString(user.getName());
-    
-    return Response(StatusCode::OK).json(*json);
+router.get("/api/users/:id", withAuth([usersController](const Request& req) {
+    return usersController->getById(req);
 }));
 
 // PUT /api/users/:id - Atualizar usuário
-router.put("/api/users/:id", withAuth([updateUserUseCase](const Request& req) {
-    std::string userId = req.getParam("id");
-    std::string loggedUserId = req.getCustomData("user_id");
-    
-    // Parse body
-    auto jsonValue = req.getJson();
-    if (!jsonValue || !jsonValue->isObject()) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("Invalid JSON body");
-        return Response(StatusCode::BadRequest).json(*error);
-    }
-    
-    auto obj = jsonValue->asObject();
-    
-    // Criar DTO
-    Domains::UserManagement::UseCases::UpdateUserDto dto;
-    dto.userId = userId;
-    dto.requestingUserId = loggedUserId;
-    
-    if (obj.count("name") && obj["name"]->isString()) {
-        dto.name = obj["name"]->asString();
-    }
-    if (obj.count("email") && obj["email"]->isString()) {
-        dto.email = obj["email"]->asString();
-    }
-    
-    try {
-        auto user = updateUserUseCase->execute(dto);
-        
-        auto json = Core::Json::makeObject();
-        json->asObject()["status"] = Core::Json::makeString("success");
-        json->asObject()["message"] = Core::Json::makeString("User updated successfully");
-        json->asObject()["user"] = Core::Json::makeObject();
-        json->asObject()["user"]->asObject()["id"] = Core::Json::makeString(user.getId());
-        json->asObject()["user"]->asObject()["email"] = Core::Json::makeString(user.getEmail().value());
-        json->asObject()["user"]->asObject()["name"] = Core::Json::makeString(user.getName());
-        
-        return Response(StatusCode::OK).json(*json);
-    } catch (const std::exception& e) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString(e.what());
-        return Response(StatusCode::BadRequest).json(*error);
-    }
+router.put("/api/users/:id", withAuth([usersController](const Request& req) {
+    return usersController->update(req);
 }));
 
 // PUT /api/users/:id/password - Trocar senha (formato snake_case)
-router.put("/api/users/:id/password", withAuth([changePasswordUseCase](const Request& req) {
-    std::string userId = req.getParam("id");
-    std::string loggedUserId = req.getCustomData("user_id");
-    
-    // Parse body
-    auto jsonValue = req.getJson();
-    if (!jsonValue || !jsonValue->isObject()) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("Invalid JSON body");
-        return Response(StatusCode::BadRequest).json(*error);
-    }
-    
-    auto obj = jsonValue->asObject();
-    
-    // Aceita tanto snake_case quanto camelCase
-    bool hasOldPassword = obj.count("old_password") || obj.count("oldPassword");
-    bool hasNewPassword = obj.count("new_password") || obj.count("newPassword");
-    
-    if (!hasOldPassword || !hasNewPassword) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("old_password and new_password are required");
-        return Response(StatusCode::BadRequest).json(*error);
-    }
-    
-    std::string oldPassword = obj.count("old_password") ? 
-        obj["old_password"]->asString() : obj["oldPassword"]->asString();
-    std::string newPassword = obj.count("new_password") ? 
-        obj["new_password"]->asString() : obj["newPassword"]->asString();
-    
-    // Criar DTO
-    Domains::UserManagement::UseCases::ChangePasswordDto dto;
-    dto.userId = userId;
-    dto.requestingUserId = loggedUserId;
-    dto.oldPassword = oldPassword;
-    dto.newPassword = newPassword;
-    
-    try {
-        changePasswordUseCase->execute(dto);
-        
-        auto json = Core::Json::makeObject();
-        json->asObject()["status"] = Core::Json::makeString("success");
-        json->asObject()["message"] = Core::Json::makeString("Password changed successfully");
-        
-        return Response(StatusCode::OK).json(*json);
-    } catch (const std::exception& e) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString(e.what());
-        return Response(StatusCode::BadRequest).json(*error);
-    }
+router.put("/api/users/:id/password", withAuth([usersController](const Request& req) {
+    return usersController->changePassword(req);
 }));
 
 // POST /api/users/:id/change-password - Trocar senha (formato camelCase - deprecated)
-router.post("/api/users/:id/change-password", withAuth([changePasswordUseCase](const Request& req) {
-    std::string userId = req.getParam("id");
-    std::string loggedUserId = req.getCustomData("user_id");
-    
-    // Parse body
-    auto jsonValue = req.getJson();
-    if (!jsonValue || !jsonValue->isObject()) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("Invalid JSON body");
-        return Response(StatusCode::BadRequest).json(*error);
-    }
-    
-    auto obj = jsonValue->asObject();
-    
-    if (!obj.count("oldPassword") || !obj.count("newPassword")) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString("oldPassword and newPassword are required");
-        return Response(StatusCode::BadRequest).json(*error);
-    }
-    
-    Domains::UserManagement::UseCases::ChangePasswordDto dto;
-    dto.userId = userId;
-    dto.requestingUserId = loggedUserId;
-    dto.oldPassword = obj["oldPassword"]->asString();
-    dto.newPassword = obj["newPassword"]->asString();
-    
-    try {
-        changePasswordUseCase->execute(dto);
-        
-        auto json = Core::Json::makeObject();
-        json->asObject()["status"] = Core::Json::makeString("success");
-        json->asObject()["message"] = Core::Json::makeString("Password changed successfully");
-        
-        return Response(StatusCode::OK).json(*json);
-    } catch (const std::exception& e) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString(e.what());
-        return Response(StatusCode::BadRequest).json(*error);
-    }
+router.post("/api/users/:id/change-password", withAuth([usersController](const Request& req) {
+    return usersController->changePasswordDeprecated(req);
 }));
 
 // DELETE /api/users/:id - Deletar usuário (soft delete)
-router.del("/api/users/:id", withAuth([deleteUserUseCase](const Request& req) {
-    std::string userId = req.getParam("id");
-    std::string loggedUserId = req.getCustomData("user_id");
-    std::string loggedUserRole = req.getCustomData("user_role");
-    
-    Domains::UserManagement::UseCases::DeleteUserDto dto;
-    dto.userId = userId;
-    dto.requestingUserId = loggedUserId;
-    dto.requestingUserRole = loggedUserRole;
-    
-    try {
-        deleteUserUseCase->execute(dto);
-        
-        auto json = Core::Json::makeObject();
-        json->asObject()["status"] = Core::Json::makeString("success");
-        json->asObject()["message"] = Core::Json::makeString("User deleted successfully");
-        
-        return Response(StatusCode::OK).json(*json);
-    } catch (const std::exception& e) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString(e.what());
-        return Response(StatusCode::Forbidden).json(*error);
-    }
+router.del("/api/users/:id", withAuth([usersController](const Request& req) {
+    return usersController->delete_(req);
 }));
 
 // GET /api/users - Listar usuários (apenas admins)
-router.get("/api/users", withAuthAndRole({"admin", "owner"}, [listUsersUseCase](const Request& req) {
-    std::string loggedUserRole = req.getCustomData("user_role");
-    
-    // Parse query params (limit, offset)
-    // TODO: Implementar parsing de query params no Request
-    int limit = 50;
-    int offset = 0;
-    
-    Domains::UserManagement::UseCases::ListUsersDto dto;
-    dto.limit = limit;
-    dto.offset = offset;
-    dto.requestingUserRole = loggedUserRole;
-    
-    try {
-        auto result = listUsersUseCase->execute(dto);
-        
-        auto json = Core::Json::makeObject();
-        json->asObject()["status"] = Core::Json::makeString("success");
-        json->asObject()["total"] = Core::Json::makeNumber(result.total);
-        json->asObject()["limit"] = Core::Json::makeNumber(result.limit);
-        json->asObject()["offset"] = Core::Json::makeNumber(result.offset);
-        
-        auto usersArray = Core::Json::makeArray();
-        for (const auto& user : result.users) {
-            auto userObj = Core::Json::makeObject();
-            userObj->asObject()["id"] = Core::Json::makeString(user.getId());
-            userObj->asObject()["email"] = Core::Json::makeString(user.getEmail().value());
-            userObj->asObject()["name"] = Core::Json::makeString(user.getName());
-            userObj->asObject()["is_active"] = Core::Json::makeBool(user.isActive());
-            usersArray->asArray().push_back(userObj);
-        }
-        json->asObject()["users"] = usersArray;
-        
-        return Response(StatusCode::OK).json(*json);
-    } catch (const std::exception& e) {
-        auto error = Core::Json::makeObject();
-        error->asObject()["status"] = Core::Json::makeString("error");
-        error->asObject()["message"] = Core::Json::makeString(e.what());
-        return Response(StatusCode::Forbidden).json(*error);
-    }
+router.get("/api/users", withAuthAndRole({"admin", "owner"}, [usersController](const Request& req) {
+    return usersController->list(req);
 }));
 
 // ==================== TENANT MANAGEMENT ====================
 
 // GET /api/tenants/:id/members - Listar membros do tenant
-router.get("/api/tenants/:tenantId/members", withAuth([listTenantMembersUseCase](const Request& req) {
+router.get("/api/tenants/:tenantId/members", withAuthAndRole({"super_admin"}, [listTenantMembersUseCase](const Request& req) {
     std::string tenantId = req.getParam("tenantId");
     std::string loggedUserId = req.getCustomData("user_id");
-    std::string loggedUserRole = req.getCustomData("user_role");
-    
-    Domains::TenantManagement::UseCases::ListTenantMembersDto dto;
-    dto.tenantId = tenantId;
-    dto.requestingUserId = loggedUserId;
-    dto.requestingUserRole = loggedUserRole;
+    std::string loggedUserRoleStr = req.getCustomData("user_role");
     
     try {
+        Domains::TenantManagement::ValueObjects::TenantUserRole loggedUserRole(loggedUserRoleStr);
+        
+        Domains::TenantManagement::UseCases::ListTenantMembersDto dto;
+        dto.tenantId = tenantId;
+        dto.requestingUserId = loggedUserId;
+        dto.requestingUserRole = loggedUserRole;
+        
         auto members = listTenantMembersUseCase->execute(dto);
         
         auto json = Core::Json::makeObject();
@@ -1145,13 +909,18 @@ router.get("/api/tenants/:tenantId/members", withAuth([listTenantMembersUseCase]
             memberObj->asObject()["userId"] = Core::Json::makeString(member.userId);
             memberObj->asObject()["email"] = Core::Json::makeString(member.email);
             memberObj->asObject()["name"] = Core::Json::makeString(member.name);
-            memberObj->asObject()["role"] = Core::Json::makeString(member.role);
+            memberObj->asObject()["role"] = Core::Json::makeString(member.role.toString());
             memberObj->asObject()["isActive"] = Core::Json::makeBool(member.isActive);
             membersArray->asArray().push_back(memberObj);
         }
         json->asObject()["members"] = membersArray;
         
         return Response(StatusCode::OK).json(*json);
+    } catch (const std::invalid_argument& e) {
+        auto error = Core::Json::makeObject();
+        error->asObject()["status"] = Core::Json::makeString("error");
+        error->asObject()["message"] = Core::Json::makeString("Invalid role: " + std::string(e.what()));
+        return Response(StatusCode::BadRequest).json(*error);
     } catch (const std::exception& e) {
         auto error = Core::Json::makeObject();
         error->asObject()["status"] = Core::Json::makeString("error");
@@ -1161,10 +930,10 @@ router.get("/api/tenants/:tenantId/members", withAuth([listTenantMembersUseCase]
 }));
 
 // POST /api/tenants/:id/users - Adicionar usuário ao tenant
-router.post("/api/tenants/:tenantId/users", withAuthAndRole({"admin", "owner"}, [addUserToTenantUseCase](const Request& req) {
+router.post("/api/tenants/:tenantId/users", withAuthAndRole({"super_admin"}, [addUserToTenantUseCase](const Request& req) {
     std::string tenantId = req.getParam("tenantId");
     std::string loggedUserId = req.getCustomData("user_id");
-    std::string loggedUserRole = req.getCustomData("user_role");
+    std::string loggedUserRoleStr = req.getCustomData("user_role");
     
     // Parse body
     auto jsonValue = req.getJson();
@@ -1184,14 +953,17 @@ router.post("/api/tenants/:tenantId/users", withAuthAndRole({"admin", "owner"}, 
         return Response(StatusCode::BadRequest).json(*error);
     }
     
-    Domains::TenantManagement::UseCases::AddUserToTenantDto dto;
-    dto.tenantId = tenantId;
-    dto.userId = obj["userId"]->asString();
-    dto.role = obj["role"]->asString();
-    dto.requestingUserId = loggedUserId;
-    dto.requestingUserRole = loggedUserRole;
-    
     try {
+        Domains::TenantManagement::ValueObjects::TenantUserRole loggedUserRole(loggedUserRoleStr);
+        Domains::TenantManagement::ValueObjects::TenantUserRole role(obj["role"]->asString());
+        
+        Domains::TenantManagement::UseCases::AddUserToTenantDto dto;
+        dto.tenantId = tenantId;
+        dto.userId = obj["userId"]->asString();
+        dto.role = role;
+        dto.requestingUserId = loggedUserId;
+        dto.requestingUserRole = loggedUserRole;
+        
         addUserToTenantUseCase->execute(dto);
         
         auto json = Core::Json::makeObject();
@@ -1199,6 +971,11 @@ router.post("/api/tenants/:tenantId/users", withAuthAndRole({"admin", "owner"}, 
         json->asObject()["message"] = Core::Json::makeString("User added to tenant successfully");
         
         return Response(StatusCode::OK).json(*json);
+    } catch (const std::invalid_argument& e) {
+        auto error = Core::Json::makeObject();
+        error->asObject()["status"] = Core::Json::makeString("error");
+        error->asObject()["message"] = Core::Json::makeString("Invalid role: " + std::string(e.what()));
+        return Response(StatusCode::BadRequest).json(*error);
     } catch (const std::exception& e) {
         auto error = Core::Json::makeObject();
         error->asObject()["status"] = Core::Json::makeString("error");
@@ -1208,11 +985,11 @@ router.post("/api/tenants/:tenantId/users", withAuthAndRole({"admin", "owner"}, 
 }));
 
 // PUT /api/tenants/:id/users/:userId/role - Atualizar role do usuário
-router.put("/api/tenants/:tenantId/users/:userId/role", withAuthAndRole({"admin", "owner"}, [updateUserRoleUseCase](const Request& req) {
+router.put("/api/tenants/:tenantId/users/:userId/role", withAuthAndRole({"super_admin"}, [updateUserRoleUseCase](const Request& req) {
     std::string tenantId = req.getParam("tenantId");
     std::string userId = req.getParam("userId");
     std::string loggedUserId = req.getCustomData("user_id");
-    std::string loggedUserRole = req.getCustomData("user_role");
+    std::string loggedUserRoleStr = req.getCustomData("user_role");
     
     // Parse body
     auto jsonValue = req.getJson();
@@ -1232,14 +1009,17 @@ router.put("/api/tenants/:tenantId/users/:userId/role", withAuthAndRole({"admin"
         return Response(StatusCode::BadRequest).json(*error);
     }
     
-    Domains::TenantManagement::UseCases::UpdateUserRoleDto dto;
-    dto.tenantId = tenantId;
-    dto.userId = userId;
-    dto.newRole = obj["role"]->asString();
-    dto.requestingUserId = loggedUserId;
-    dto.requestingUserRole = loggedUserRole;
-    
     try {
+        Domains::TenantManagement::ValueObjects::TenantUserRole loggedUserRole(loggedUserRoleStr);
+        Domains::TenantManagement::ValueObjects::TenantUserRole newRole(obj["role"]->asString());
+        
+        Domains::TenantManagement::UseCases::UpdateUserRoleDto dto;
+        dto.tenantId = tenantId;
+        dto.userId = userId;
+        dto.newRole = newRole;
+        dto.requestingUserId = loggedUserId;
+        dto.requestingUserRole = loggedUserRole;
+        
         updateUserRoleUseCase->execute(dto);
         
         auto json = Core::Json::makeObject();
@@ -1247,6 +1027,11 @@ router.put("/api/tenants/:tenantId/users/:userId/role", withAuthAndRole({"admin"
         json->asObject()["message"] = Core::Json::makeString("User role updated successfully");
         
         return Response(StatusCode::OK).json(*json);
+    } catch (const std::invalid_argument& e) {
+        auto error = Core::Json::makeObject();
+        error->asObject()["status"] = Core::Json::makeString("error");
+        error->asObject()["message"] = Core::Json::makeString("Invalid role: " + std::string(e.what()));
+        return Response(StatusCode::BadRequest).json(*error);
     } catch (const std::exception& e) {
         auto error = Core::Json::makeObject();
         error->asObject()["status"] = Core::Json::makeString("error");
@@ -1256,19 +1041,21 @@ router.put("/api/tenants/:tenantId/users/:userId/role", withAuthAndRole({"admin"
 }));
 
 // DELETE /api/tenants/:id/users/:userId - Remover usuário do tenant
-router.del("/api/tenants/:tenantId/users/:userId", withAuthAndRole({"admin", "owner"}, [removeUserFromTenantUseCase](const Request& req) {
+router.del("/api/tenants/:tenantId/users/:userId", withAuthAndRole({"super_admin"}, [removeUserFromTenantUseCase](const Request& req) {
     std::string tenantId = req.getParam("tenantId");
     std::string userId = req.getParam("userId");
     std::string loggedUserId = req.getCustomData("user_id");
-    std::string loggedUserRole = req.getCustomData("user_role");
-    
-    Domains::TenantManagement::UseCases::RemoveUserFromTenantDto dto;
-    dto.tenantId = tenantId;
-    dto.userId = userId;
-    dto.requestingUserId = loggedUserId;
-    dto.requestingUserRole = loggedUserRole;
+    std::string loggedUserRoleStr = req.getCustomData("user_role");
     
     try {
+        Domains::TenantManagement::ValueObjects::TenantUserRole loggedUserRole(loggedUserRoleStr);
+        
+        Domains::TenantManagement::UseCases::RemoveUserFromTenantDto dto;
+        dto.tenantId = tenantId;
+        dto.userId = userId;
+        dto.requestingUserId = loggedUserId;
+        dto.requestingUserRole = loggedUserRole;
+        
         removeUserFromTenantUseCase->execute(dto);
         
         auto json = Core::Json::makeObject();

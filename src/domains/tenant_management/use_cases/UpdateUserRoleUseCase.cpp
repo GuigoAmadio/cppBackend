@@ -6,18 +6,6 @@ namespace Domains::TenantManagement::UseCases {
 UpdateUserRoleUseCase::UpdateUserRoleUseCase(std::shared_ptr<TenantRepository> repository)
     : repository_(repository) {}
 
-bool UpdateUserRoleUseCase::canManageRoles(const std::string& role) const {
-    return role == "owner" || role == "admin";
-}
-
-int UpdateUserRoleUseCase::getRolePriority(const std::string& role) const {
-    if (role == "owner") return 4;
-    if (role == "admin") return 3;
-    if (role == "user") return 2;
-    if (role == "viewer") return 1;
-    return 0;
-}
-
 void UpdateUserRoleUseCase::execute(const UpdateUserRoleDto& dto) {
     // 1. Verificar se tenant existe
     auto tenantOpt = repository_->findById(dto.tenantId);
@@ -26,10 +14,10 @@ void UpdateUserRoleUseCase::execute(const UpdateUserRoleDto& dto) {
         throw std::runtime_error("Tenant not found");
     }
     
-    // 2. Verificar autorização (apenas owner/admin)
-    if (!canManageRoles(dto.requestingUserRole)) {
+    // 2. Verificar autorização (apenas quem pode gerenciar roles)
+    if (!dto.requestingUserRole.canManageRoles()) {
         LOG_WARNING("UpdateUserRole failed: insufficient permissions - " + 
-                   dto.requestingUserId + " (role: " + dto.requestingUserRole + ")");
+                   dto.requestingUserId + " (role: " + dto.requestingUserRole.toString() + ")");
         throw std::runtime_error("Only owners and admins can manage roles");
     }
     
@@ -40,12 +28,9 @@ void UpdateUserRoleUseCase::execute(const UpdateUserRoleDto& dto) {
     }
     
     // 4. Verificar se não está promovendo acima da própria role
-    int requestingPriority = getRolePriority(dto.requestingUserRole);
-    int newRolePriority = getRolePriority(dto.newRole);
-    
-    if (newRolePriority > requestingPriority) {
+    if (!dto.requestingUserRole.canModifyRole(dto.newRole)) {
         LOG_WARNING("UpdateUserRole failed: attempting to assign higher role - " + 
-                   dto.requestingUserId + " trying to assign " + dto.newRole);
+                   dto.requestingUserId + " trying to assign " + dto.newRole.toString());
         throw std::runtime_error("You cannot assign a role higher than your own");
     }
     
@@ -59,7 +44,7 @@ void UpdateUserRoleUseCase::execute(const UpdateUserRoleDto& dto) {
     // 6. Atualizar role
     repository_->updateUserRole(dto.userId, dto.tenantId, dto.newRole);
     
-    LOG_INFO("User role updated: " + dto.userId + " -> " + dto.newRole + 
+    LOG_INFO("User role updated: " + dto.userId + " -> " + dto.newRole.toString() + 
              " in tenant " + dto.tenantId + " by " + dto.requestingUserId);
 }
 

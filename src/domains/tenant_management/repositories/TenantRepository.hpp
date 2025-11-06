@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../tenant_management/entities/Tenant.hpp"
+#include "../../tenant_management/value_objects/TenantUserRole.hpp"
 #include "../../../core/database/ConnectionPool.hpp"
 #include <memory>
 #include <optional>
@@ -71,9 +72,9 @@ public:
      * @brief Obtém a role de um user em um tenant específico
      * @param userId ID do user
      * @param tenantId ID do tenant
-     * @return Role como string ("owner", "admin", "user", "viewer") ou std::nullopt
+     * @return TenantUserRole se encontrado, std::nullopt se não encontrado
      */
-    std::optional<std::string> getUserRoleInTenant(
+    std::optional<ValueObjects::TenantUserRole> getUserRoleInTenant(
         const std::string& userId,
         const std::string& tenantId
     );
@@ -88,7 +89,7 @@ public:
     void addUserToTenant(
         const std::string& userId,
         const std::string& tenantId,
-        const std::string& role,
+        const ValueObjects::TenantUserRole& role,
         const std::optional<std::string>& invitedBy = std::nullopt
     );
 
@@ -108,7 +109,7 @@ public:
     void updateUserRole(
         const std::string& userId,
         const std::string& tenantId,
-        const std::string& newRole
+        const ValueObjects::TenantUserRole& newRole
     );
 
     /**

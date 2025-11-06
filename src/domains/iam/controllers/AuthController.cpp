@@ -57,14 +57,30 @@ Response AuthController::register_(const Request& req) {
         // Note: Role is now tenant-specific and assigned in user_tenants table
         
         // 3. Executar use case
-        User user = registerUseCase_->execute(dto);
+        LOG_DEBUG("🔵 [REGISTER] Calling use case with email: " + dto.email);
+        RegisterResult result = registerUseCase_->execute(dto);
+        LOG_DEBUG("✅ [REGISTER] Use case executed successfully");
+        LOG_DEBUG("   User ID: " + result.user.getId());
+        LOG_DEBUG("   Tenant ID: " + result.tenant_id);
+        LOG_DEBUG("   Tenant Subdomain: " + result.tenant_subdomain);
+        LOG_DEBUG("   Role: " + result.role);
+        LOG_DEBUG("   Token generated: " + std::string(result.token.empty() ? "NO" : "YES"));
+        LOG_DEBUG("   RefreshToken generated: " + std::string(result.refreshToken.empty() ? "NO" : "YES"));
         
-        // 4. Retornar resposta
+        // 4. Retornar resposta com tokens
         auto response = Core::Json::makeObject();
         response->asObject()["status"] = Core::Json::makeString("success");
         response->asObject()["message"] = Core::Json::makeString("User registered successfully");
-        response->asObject()["user"] = userToJson(user);
+        response->asObject()["user"] = userToJson(result.user);
+        response->asObject()["tokens"] = Core::Json::makeObject();
+        response->asObject()["tokens"]->asObject()["accessToken"] = Core::Json::makeString(result.token);
+        response->asObject()["tokens"]->asObject()["refreshToken"] = Core::Json::makeString(result.refreshToken);
+        response->asObject()["tenant"] = Core::Json::makeObject();
+        response->asObject()["tenant"]->asObject()["id"] = Core::Json::makeString(result.tenant_id);
+        response->asObject()["tenant"]->asObject()["subdomain"] = Core::Json::makeString(result.tenant_subdomain);
+        response->asObject()["role"] = Core::Json::makeString(result.role);
         
+        LOG_DEBUG("✅ [REGISTER] Returning successful response with tokens");
         return Response(StatusCode::Created).json(*response);
         
     } catch (const std::invalid_argument& e) {
@@ -130,17 +146,45 @@ Response AuthController::login(const Request& req) {
         dto.email = obj["email"]->asString();
         dto.password = obj["password"]->asString();
         
-        // Extrair tenant context - PRIORIDADE: body > middleware
-        // 1. Tentar do body (enviado explicitamente pelo cliente)
+        // Extrair tenant context com lógica de prioridade baseada em role
+        // 1. Verificar se há token válido (usuário já autenticado tentando acessar outro tenant)
+        std::string userRole = req.getCustomData("user_role");
+        std::string tokenTenantSubdomain = req.getCustomData("user_tenant_subdomain");
+        std::string bodyTenantSubdomain = "";
+        std::string middlewareTenantSubdomain = req.getCustomData("tenant_subdomain");
+        
+        // Extrair tenant_subdomain do body se fornecido
         if (obj.count("tenant_subdomain") && obj["tenant_subdomain"]->isString()) {
-            dto.tenant_subdomain = obj["tenant_subdomain"]->asString();
-            LOG_DEBUG("tenant_subdomain from body: " + dto.tenant_subdomain);
+            bodyTenantSubdomain = obj["tenant_subdomain"]->asString();
+            LOG_DEBUG("tenant_subdomain from body: " + bodyTenantSubdomain);
+        }
+        
+        // Lógica de prioridade:
+        // - Se usuário tem role "super_admin" no token E forneceu tenant_subdomain no body:
+        //   → Usar tenant do body (permite acessar outro tenant)
+        // - Caso contrário:
+        //   → Usar tenant do token (se existir) ou do middleware
+        
+        if (userRole == "super_admin" && !bodyTenantSubdomain.empty()) {
+            // Super admin pode usar tenant do body para acessar outro tenant
+            dto.tenant_subdomain = bodyTenantSubdomain;
+            LOG_DEBUG("Super admin detected - using tenant_subdomain from body: " + bodyTenantSubdomain);
+        } else if (!tokenTenantSubdomain.empty()) {
+            // Usar tenant do token (usuário já autenticado)
+            dto.tenant_subdomain = tokenTenantSubdomain;
+            LOG_DEBUG("Using tenant_subdomain from token: " + tokenTenantSubdomain);
+        } else if (!bodyTenantSubdomain.empty()) {
+            // Login sem token anterior - usar do body
+            dto.tenant_subdomain = bodyTenantSubdomain;
+            LOG_DEBUG("Using tenant_subdomain from body (no token): " + bodyTenantSubdomain);
         } else {
-            // 2. Fallback para middleware (extraído do subdomain da URL)
-            dto.tenant_subdomain = req.getCustomData("tenant_subdomain");
+            // Fallback para middleware (extraído do subdomain da URL)
+            dto.tenant_subdomain = middlewareTenantSubdomain;
+            LOG_DEBUG("Using tenant_subdomain from middleware: " + middlewareTenantSubdomain);
         }
         
         // tenant_id sempre do middleware (setado pelo TenantMiddleware após resolver subdomain)
+        // Se tenant_subdomain veio do body/token, o tenant_id será resolvido no use case
         dto.tenant_id = req.getCustomData("tenant_id");
         
         LOG_DEBUG("Login attempt: email=" + dto.email + ", tenant_id=" + dto.tenant_id + 

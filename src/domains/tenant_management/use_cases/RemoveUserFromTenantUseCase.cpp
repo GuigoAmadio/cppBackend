@@ -6,10 +6,6 @@ namespace Domains::TenantManagement::UseCases {
 RemoveUserFromTenantUseCase::RemoveUserFromTenantUseCase(std::shared_ptr<TenantRepository> repository)
     : repository_(repository) {}
 
-bool RemoveUserFromTenantUseCase::canManageMembers(const std::string& role) const {
-    return role == "owner" || role == "admin";
-}
-
 void RemoveUserFromTenantUseCase::execute(const RemoveUserFromTenantDto& dto) {
     // 1. Verificar se tenant existe
     auto tenantOpt = repository_->findById(dto.tenantId);
@@ -18,10 +14,10 @@ void RemoveUserFromTenantUseCase::execute(const RemoveUserFromTenantDto& dto) {
         throw std::runtime_error("Tenant not found");
     }
     
-    // 2. Verificar autorização (apenas owner/admin)
-    if (!canManageMembers(dto.requestingUserRole)) {
+    // 2. Verificar autorização (apenas quem pode gerenciar membros)
+    if (!dto.requestingUserRole.canManageMembers()) {
         LOG_WARNING("RemoveUserFromTenant failed: insufficient permissions - " + 
-                   dto.requestingUserId + " (role: " + dto.requestingUserRole + ")");
+                   dto.requestingUserId + " (role: " + dto.requestingUserRole.toString() + ")");
         throw std::runtime_error("Only owners and admins can remove members");
     }
     
@@ -33,16 +29,16 @@ void RemoveUserFromTenantUseCase::execute(const RemoveUserFromTenantDto& dto) {
         throw std::runtime_error("User is not a member of this tenant");
     }
     
-    std::string targetRole = targetRoleOpt.value();
+    auto targetRole = targetRoleOpt.value();
     
     // 4. Owner não pode se auto-remover
-    if (dto.userId == dto.requestingUserId && dto.requestingUserRole == "owner") {
+    if (dto.userId == dto.requestingUserId && dto.requestingUserRole.isOwner()) {
         LOG_WARNING("RemoveUserFromTenant failed: owner self-removal attempt - " + dto.requestingUserId);
         throw std::runtime_error("Owner cannot remove themselves. Transfer ownership first.");
     }
     
-    // 5. Admin não pode remover owner (apenas owner pode)
-    if (targetRole == "owner" && dto.requestingUserRole != "owner") {
+    // 5. Apenas owner pode remover outro owner
+    if (targetRole.isOwner() && !dto.requestingUserRole.isOwner()) {
         LOG_WARNING("RemoveUserFromTenant failed: non-owner attempting to remove owner - " + 
                    dto.requestingUserId);
         throw std::runtime_error("Only owners can remove other owners");

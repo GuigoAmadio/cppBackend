@@ -7,6 +7,7 @@
 #include "../value_objects/Email.hpp"
 #include "../value_objects/Password.hpp"
 #include "../../iam/services/BcryptService.hpp"
+#include "../../iam/services/JwtService.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +29,18 @@ struct RegisterUserDto {
 };
 
 /**
+ * @brief Resultado do registro (similar ao LoginResult).
+ */
+struct RegisterResult {
+    User user;
+    std::string token;
+    std::string refreshToken;
+    std::string tenant_id;
+    std::string tenant_subdomain;
+    std::string role;
+};
+
+/**
  * @brief Use Case: Registrar novo usuário.
  * 
  * Regras de negócio:
@@ -42,6 +55,7 @@ public:
     explicit RegisterUserUseCase(
         std::shared_ptr<Domains::UserManagement::Repositories::UserRepository> repository,
         std::shared_ptr<Domains::IAM::Services::BcryptService> bcryptService,
+        std::shared_ptr<Domains::IAM::Services::JwtService> jwtService,
         std::shared_ptr<Domains::Audit::Repositories::AuditLogRepository> auditLogRepository,
         std::shared_ptr<Domains::TenantManagement::Repositories::TenantRepository> tenantRepository
     );
@@ -51,11 +65,12 @@ public:
      * @throws std::invalid_argument se validação falhar
      * @throws std::runtime_error se email já existe ou tenant não encontrado
      */
-    User execute(const RegisterUserDto& dto);
+    RegisterResult execute(const RegisterUserDto& dto);
 
 private:
     std::shared_ptr<Domains::UserManagement::Repositories::UserRepository> repository_;
     std::shared_ptr<Domains::IAM::Services::BcryptService> bcryptService_;
+    std::shared_ptr<Domains::IAM::Services::JwtService> jwtService_;
     std::shared_ptr<Domains::Audit::Repositories::AuditLogRepository> auditLogRepository_;
     std::shared_ptr<Domains::TenantManagement::Repositories::TenantRepository> tenantRepository_;
     
